@@ -86,7 +86,7 @@ function AddDialog({ onClose }: { onClose: () => void }) {
               </>
             )}
 
-            <RadioGroup value={role} onChange={(value: string) => setRole(value as Role)}>
+            <RadioGroup value={role} variant="secondary" onChange={(value: string) => setRole(value as Role)}>
               <Label>Role</Label>
               {ROLES.map((r) => (
                 <Radio key={r.role} value={r.role}>
