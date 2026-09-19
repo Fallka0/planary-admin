@@ -1,7 +1,8 @@
 "use client";
 
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { Button, Card, Skeleton, Table } from "@heroui/react";
 import { BarChart } from "@/components/ui";
 import { type Figures, useAdmin } from "@/lib/api";
 import { chips, pct, signed } from "@/lib/format";
@@ -18,139 +19,177 @@ interface Overview {
 }
 
 const GAME_NAME: Record<string, string> = { blackjack: "Blackjack", roulette: "Roulette" };
+const METRICS = {
+  ggr: { label: "House result", help: "Chips the house kept: wagers minus payouts. Below the line, players came out ahead that day." },
+  handle: { label: "Chips wagered", help: "Every chip bet at the tables." },
+  players: { label: "Players at the tables", help: "Distinct players who placed at least one bet." },
+  signups: { label: "New players", help: "Accounts that opened the casino for the first time." },
+} as const;
 
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
   return (
-    <div className="card kpi">
-      <dt>{label}</dt>
-      <dd className={tone}>{value}</dd>
-      {sub ? <div className="kpi-sub">{sub}</div> : null}
+    <Card variant="default">
+      <Card.Content className="grid w-full gap-1 p-4">
+        <span className="text-default-500 text-xs font-medium">{label}</span>
+        <span className={`num text-2xl font-bold tracking-tight ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}>{value}</span>
+        {sub ? <span className="text-default-500 num text-xs">{sub}</span> : null}
+      </Card.Content>
+    </Card>
+  );
+}
+
+function Toggle<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: [T, string][]; label: string }) {
+  return (
+    <div role="group" aria-label={label} className="bg-default-100 flex gap-0.5 rounded-lg p-0.5">
+      {options.map(([key, text]) => (
+        <Button key={key} size="sm" variant={value === key ? "secondary" : "ghost"} aria-pressed={value === key} onPress={() => onChange(key)}>
+          {text}
+        </Button>
+      ))}
     </div>
   );
 }
 
 export default function OverviewPage() {
-  const [days, setDays] = useState(30);
+  const router = useRouter();
+  const [days, setDays] = useState<"7" | "30" | "90">("30");
+  const [metric, setMetric] = useState<keyof typeof METRICS>("ggr");
   const { data } = useAdmin<Overview>(`/overview?days=${days}`, 60_000);
-  const [metric, setMetric] = useState<"ggr" | "handle" | "players" | "signups">("ggr");
 
-  if (!data) return <div className="card empty">Loading figures…</div>;
+  if (!data) {
+    return (
+      <div className="grid gap-5">
+        <Skeleton className="h-9 w-48 rounded-lg" />
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+          {Array.from({ length: 6 }, (_, i) => (
+            <Skeleton key={i} className="h-24 rounded-xl" />
+          ))}
+        </div>
+        <Skeleton className="h-72 rounded-xl" />
+      </div>
+    );
+  }
+
   const p = data.players;
-  const metricLabel = { ggr: "House result", handle: "Chips wagered", players: "Players at the tables", signups: "New players" }[metric];
+  const m = METRICS[metric];
 
   return (
     <>
-      <div className="page-head">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1>Overview</h1>
-          <p>Play-money figures across Planary Casino. Days follow Zurich time.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
+          <p className="text-default-500">Play-money figures across Planary Casino. Days follow Zurich time.</p>
         </div>
-        <div className="segmented" role="group" aria-label="Period">
-          {[7, 30, 90].map((d) => (
-            <button key={d} aria-pressed={days === d} onClick={() => setDays(d)}>
-              {d} days
-            </button>
-          ))}
-        </div>
-      </div>
+        <Toggle
+          label="Period"
+          value={days}
+          onChange={setDays}
+          options={[
+            ["7", "7 days"],
+            ["30", "30 days"],
+            ["90", "90 days"],
+          ]}
+        />
+      </header>
 
-      <dl className="kpis">
+      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Key figures">
         <Kpi label="Players online" value={chips(p.online)} sub={`${chips(p.players)} registered`} />
         <Kpi label="New players" value={chips(p.new_today)} sub={`${chips(p.new_week)} in 7 days`} />
         <Kpi label="Wagered today" value={chips(data.today.handle)} sub={`${chips(data.today.players)} players, ${chips(data.today.bets)} bets`} />
-        <Kpi
-          label="House result today"
-          value={signed(data.today.ggr)}
-          tone={data.today.ggr >= 0 ? "up" : "down"}
-          sub={`RTP ${pct(data.today.rtp)}`}
-        />
+        <Kpi label="House result today" value={signed(data.today.ggr)} tone={data.today.ggr >= 0 ? "up" : "down"} sub={`RTP ${pct(data.today.rtp)}`} />
         <Kpi label="Chips in circulation" value={chips(p.circulation)} sub="All player balances" />
         <Kpi label="Restricted accounts" value={chips(p.restricted)} sub="Suspended or closed" />
-      </dl>
-
-      <section className="card">
-        <div className="card-head">
-          <div>
-            <h2>{metricLabel}, last {data.days} days</h2>
-            <p>
-              {metric === "ggr"
-                ? "Chips the house kept: wagers minus payouts. Below the line, players came out ahead that day."
-                : metric === "handle"
-                  ? "Every chip bet at the tables."
-                  : metric === "players"
-                    ? "Distinct players who placed at least one bet."
-                    : "Accounts that opened the casino for the first time."}
-            </p>
-          </div>
-          <div className="segmented" role="group" aria-label="Chart">
-            {(["ggr", "handle", "players", "signups"] as const).map((m) => (
-              <button key={m} aria-pressed={metric === m} onClick={() => setMetric(m)}>
-                {{ ggr: "Result", handle: "Wagered", players: "Players", signups: "Sign-ups" }[m]}
-              </button>
-            ))}
-          </div>
-        </div>
-        <div className="card-body">
-          <BarChart data={data.daily.map((d) => ({ day: d.day, value: d[metric] }))} label={metricLabel} />
-        </div>
       </section>
 
-      <div className="grid-2">
-        <section className="card">
-          <div className="card-head">
-            <h2>Games, last {data.days} days</h2>
-            <Link className="btn btn-sm" href="/games">
-              Details
-            </Link>
+      <Card>
+        <Card.Header>
+          <div className="flex w-full flex-wrap items-start justify-between gap-3">
+          <div>
+            <Card.Title>
+              {m.label}, last {data.days} days
+            </Card.Title>
+            <Card.Description>{m.help}</Card.Description>
           </div>
-          <div className="table-wrap">
-            <table className="data">
-              <thead>
-                <tr>
-                  <th>Game</th>
-                  <th className="r">Wagered</th>
-                  <th className="r">Result</th>
-                  <th className="r">RTP</th>
-                  <th className="r">Expected</th>
-                </tr>
-              </thead>
-              <tbody>
-                {data.perGame.map((g) => (
-                  <tr key={g.game}>
-                    <td>{GAME_NAME[g.game] ?? g.game}</td>
-                    <td className="r">{chips(g.handle)}</td>
-                    <td className={`r ${g.ggr >= 0 ? "up" : "down"}`}>{signed(g.ggr)}</td>
-                    <td className="r">{pct(g.rtp)}</td>
-                    <td className="r muted">{pct(g.theoretical)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <Toggle
+            label="Chart"
+            value={metric}
+            onChange={setMetric}
+            options={[
+              ["ggr", "Result"],
+              ["handle", "Wagered"],
+              ["players", "Players"],
+              ["signups", "Sign-ups"],
+            ]}
+          />
           </div>
-          <p className="card-body small muted">
-            Short-term RTP swings around the expected value; it settles as the number of bets grows.
-          </p>
-        </section>
+        </Card.Header>
+        <Card.Content>
+          <BarChart data={data.daily.map((d) => ({ day: d.day, value: d[metric] }))} label={m.label} />
+        </Card.Content>
+      </Card>
 
-        <section className="card">
-          <div className="card-head">
-            <h2>Chip flow, last {data.days} days</h2>
-          </div>
-          <div className="card-body">
-            <dl className="kv">
-              <dt>Welcome chips issued</dt>
-              <dd>+{chips(data.issued.starter)}</dd>
-              <dt>Daily bonuses issued</dt>
-              <dd>+{chips(data.issued.bonus)}</dd>
-              <dt>Staff adjustments</dt>
-              <dd>{signed(data.issued.adjustments)}</dd>
-              <dt>House result at the tables</dt>
-              <dd className={data.period.ggr >= 0 ? "up" : "down"}>{signed(-data.period.ggr)} to players</dd>
-              <dt>Spent in the shop</dt>
-              <dd>−{chips(data.issued.spentInShop)}</dd>
+      <div className="grid gap-5 lg:grid-cols-2">
+        <Card>
+          <Card.Header>
+            <div className="flex w-full items-center justify-between gap-3">
+              <Card.Title>Games, last {data.days} days</Card.Title>
+              <Button size="sm" variant="secondary" onPress={() => router.push("/games")}>
+                Details
+              </Button>
+            </div>
+          </Card.Header>
+          <Card.Content className="w-full px-0">
+            <Table>
+              <Table.ScrollContainer>
+                <Table.Content aria-label="Games">
+                  <Table.Header>
+                    <Table.Column isRowHeader>Game</Table.Column>
+                    <Table.Column>Wagered</Table.Column>
+                    <Table.Column>Result</Table.Column>
+                    <Table.Column>RTP</Table.Column>
+                    <Table.Column>Expected</Table.Column>
+                  </Table.Header>
+                  <Table.Body>
+                    {data.perGame.map((g) => (
+                      <Table.Row key={g.game}>
+                        <Table.Cell>{GAME_NAME[g.game] ?? g.game}</Table.Cell>
+                        <Table.Cell className="num">{chips(g.handle)}</Table.Cell>
+                        <Table.Cell className={`num ${g.ggr >= 0 ? "text-success" : "text-danger"}`}>{signed(g.ggr)}</Table.Cell>
+                        <Table.Cell className="num">{pct(g.rtp)}</Table.Cell>
+                        <Table.Cell className="num text-default-500">{pct(g.theoretical)}</Table.Cell>
+                      </Table.Row>
+                    ))}
+                  </Table.Body>
+                </Table.Content>
+              </Table.ScrollContainer>
+            </Table>
+          </Card.Content>
+          <Card.Footer>
+            <p className="text-default-500 text-xs">Short-term RTP swings around the expected value; it settles as the number of bets grows.</p>
+          </Card.Footer>
+        </Card>
+
+        <Card>
+          <Card.Header>
+            <Card.Title>Chip flow, last {data.days} days</Card.Title>
+          </Card.Header>
+          <Card.Content className="w-full">
+            <dl className="divide-default-200 divide-y">
+              {[
+                ["Welcome chips issued", `+${chips(data.issued.starter)}`, ""],
+                ["Daily bonuses issued", `+${chips(data.issued.bonus)}`, ""],
+                ["Staff adjustments", signed(data.issued.adjustments), ""],
+                ["House result at the tables", `${signed(-data.period.ggr)} to players`, data.period.ggr >= 0 ? "text-danger" : "text-success"],
+                ["Spent in the shop", `−${chips(data.issued.spentInShop)}`, ""],
+              ].map(([label, value, tone]) => (
+                <div key={label} className="flex items-center justify-between gap-4 py-2.5">
+                  <dt className="text-default-600">{label}</dt>
+                  <dd className={`num font-semibold ${tone}`}>{value}</dd>
+                </div>
+              ))}
             </dl>
-          </div>
-        </section>
+          </Card.Content>
+        </Card>
       </div>
     </>
   );

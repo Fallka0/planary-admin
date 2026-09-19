@@ -1,128 +1,83 @@
 "use client";
 
-import { createContext, useCallback, useContext, useEffect, useId, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { Avatar as HeroAvatar, Chip, Spinner } from "@heroui/react";
 import { avatarSrc, type Badge } from "@/lib/api";
 import { initials } from "@/lib/format";
 
-export function Avatar({ player, size = 32 }: { player: Pick<Badge, "name" | "avatar">; size?: number }) {
+const SIZES = { xs: "size-5 text-[10px]", sm: "size-7 text-[11px]", md: "size-9 text-xs", lg: "size-16 text-lg" } as const;
+
+export function Avatar({ player, size = "md" }: { player: Pick<Badge, "name" | "avatar">; size?: keyof typeof SIZES }) {
   const src = avatarSrc(player.avatar);
   return (
-    <span className="avatar" style={{ width: size, height: size, fontSize: Math.max(10, size * 0.36) }} aria-hidden="true">
-      {src ? <img src={src} alt="" width={size} height={size} loading="lazy" /> : initials(player.name)}
-    </span>
+    <HeroAvatar className={`${SIZES[size]} shrink-0`}>
+      {src ? <HeroAvatar.Image alt="" src={src} /> : null}
+      <HeroAvatar.Fallback>{initials(player.name)}</HeroAvatar.Fallback>
+    </HeroAvatar>
   );
 }
 
-export function Who({ player, sub }: { player: Pick<Badge, "name" | "avatar">; sub?: React.ReactNode }) {
+/** Avatar, name and one line underneath: the way a player appears in every list. */
+export function Who({ player, sub, size = "md" }: { player: Pick<Badge, "name" | "avatar">; sub?: React.ReactNode; size?: keyof typeof SIZES }) {
   return (
-    <span className="who">
-      <Avatar player={player} />
-      <span className="who-copy">
-        <strong>{player.name}</strong>
-        {sub ? <span>{sub}</span> : null}
-      </span>
-    </span>
-  );
-}
-
-const STATUS: Record<string, { label: string; tone: string }> = {
-  active: { label: "Active", tone: "good" },
-  suspended: { label: "Suspended", tone: "warn" },
-  banned: { label: "Closed", tone: "bad" },
-  excluded: { label: "Taking a break", tone: "info" },
-  muted: { label: "Muted", tone: "warn" },
-  open: { label: "Open", tone: "good" },
-  maintenance: { label: "Maintenance", tone: "warn" },
-  owner: { label: "Owner", tone: "accent" },
-  manager: { label: "Manager", tone: "info" },
-  support: { label: "Support", tone: "good" },
-  viewer: { label: "Viewer", tone: "" },
-};
-
-export function StatusPill({ status }: { status: string }) {
-  const s = STATUS[status] ?? { label: status, tone: "" };
-  return (
-    <span className={`pill${s.tone ? ` pill-${s.tone}` : ""}`}>
-      <span className="dot" aria-hidden="true" />
-      {s.label}
-    </span>
-  );
-}
-
-/** A modal form. Focus goes to the first field; Escape and the backdrop close it. */
-export function Dialog({
-  title,
-  onClose,
-  children,
-  footer,
-}: {
-  title: string;
-  onClose: () => void;
-  children: React.ReactNode;
-  footer: React.ReactNode;
-}) {
-  const id = useId();
-  const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const esc = (e: KeyboardEvent) => e.key === "Escape" && onClose();
-    document.addEventListener("keydown", esc);
-    ref.current?.querySelector<HTMLElement>("input, select, textarea, button:not(.dialog-x)")?.focus();
-    return () => document.removeEventListener("keydown", esc);
-  }, [onClose]);
-  return (
-    <div className="dialog-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={ref} className="card dialog" role="dialog" aria-modal="true" aria-labelledby={id}>
-        <div className="card-head">
-          <h2 id={id}>{title}</h2>
-          <button className="btn btn-ghost icon-btn dialog-x" onClick={onClose} aria-label="Close">
-            <X size={16} aria-hidden="true" />
-          </button>
-        </div>
-        <div className="dialog-body">{children}</div>
-        <div className="dialog-foot">{footer}</div>
+    <div className="flex min-w-0 items-center gap-3">
+      <Avatar player={player} size={size} />
+      <div className="min-w-0 leading-tight">
+        <div className="truncate font-medium">{player.name}</div>
+        {sub ? <div className="text-default-500 truncate text-xs">{sub}</div> : null}
       </div>
     </div>
   );
 }
 
-const ToastContext = createContext<(message: string) => void>(() => {});
-export const useToast = () => useContext(ToastContext);
+const STATUS: Record<string, { label: string; color: "default" | "accent" | "success" | "warning" | "danger" }> = {
+  active: { label: "Active", color: "success" },
+  suspended: { label: "Suspended", color: "warning" },
+  banned: { label: "Closed", color: "danger" },
+  excluded: { label: "Taking a break", color: "accent" },
+  muted: { label: "Muted", color: "warning" },
+  online: { label: "Online", color: "success" },
+  open: { label: "Open", color: "success" },
+  maintenance: { label: "Maintenance", color: "warning" },
+  owner: { label: "Owner", color: "accent" },
+  manager: { label: "Manager", color: "accent" },
+  support: { label: "Support", color: "success" },
+  viewer: { label: "Viewer", color: "default" },
+};
 
-export function ToastProvider({ children }: { children: React.ReactNode }) {
-  const [message, setMessage] = useState<string | null>(null);
-  const show = useCallback((m: string) => setMessage(m), []);
-  useEffect(() => {
-    if (!message) return;
-    const timer = window.setTimeout(() => setMessage(null), 2600);
-    return () => window.clearTimeout(timer);
-  }, [message]);
+export function StatusChip({ status }: { status: string }) {
+  const s = STATUS[status] ?? { label: status, color: "default" as const };
+  return <Chip color={s.color}>{s.label}</Chip>;
+}
+
+export function Loading({ label = "Loading…" }: { label?: string }) {
   return (
-    <ToastContext.Provider value={show}>
-      {children}
-      {message ? (
-        <div className="toast" role="status">
-          {message}
-        </div>
-      ) : null}
-    </ToastContext.Provider>
+    <div className="text-default-500 flex items-center justify-center gap-3 py-16" role="status">
+      <Spinner size="sm" />
+      {label}
+    </div>
   );
 }
 
-/** Daily bars around a zero line; negative days drop below it. */
+export function Empty({ children }: { children: React.ReactNode }) {
+  return <div className="text-default-500 py-12 text-center">{children}</div>;
+}
+
+/** Daily bars around a zero line; days the players won drop below it. */
 export function BarChart({ data, label }: { data: { day: string; value: number }[]; label: string }) {
   const w = 720;
   const h = 180;
-  const pad = { top: 10, bottom: 22, left: 0, right: 0 };
+  const padBottom = 22;
   const max = Math.max(1, ...data.map((d) => d.value));
   const min = Math.min(0, ...data.map((d) => d.value));
   const span = max - min || 1;
-  const inner = h - pad.top - pad.bottom;
-  const zero = pad.top + (max / span) * inner;
+  const inner = h - 10 - padBottom;
+  const zero = 10 + (max / span) * inner;
   const bw = w / Math.max(1, data.length);
+  const step = Math.ceil(data.length / 6);
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="chart" role="img" aria-label={label} preserveAspectRatio="none">
-      <line x1="0" x2={w} y1={zero} y2={zero} className="axis" />
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-44 w-full" role="img" aria-label={label} preserveAspectRatio="none">
+      <line x1="0" x2={w} y1={zero} y2={zero} className="stroke-default-300" strokeWidth="1" />
       {data.map((d, i) => {
         const bh = (Math.abs(d.value) / span) * inner;
         return (
@@ -133,15 +88,15 @@ export function BarChart({ data, label }: { data: { day: string; value: number }
             y={d.value >= 0 ? zero - bh : zero}
             height={Math.max(d.value === 0 ? 0 : 1, bh)}
             rx="2"
-            className={d.value >= 0 ? "bar-pos" : "bar-neg"}
+            className={d.value >= 0 ? "fill-accent" : "fill-danger"}
           >
             <title>{`${d.day}: ${d.value.toLocaleString("de-CH")}`}</title>
           </rect>
         );
       })}
       {data.map((d, i) =>
-        i % Math.ceil(data.length / 6) === 0 ? (
-          <text key={`t${d.day}`} x={i * bw + bw / 2} y={h - 6} textAnchor="middle">
+        i % step === 0 ? (
+          <text key={`t${d.day}`} x={i * bw + bw / 2} y={h - 6} textAnchor="middle" className="fill-default-500 text-[10px]">
             {d.day.slice(5).split("-").reverse().join(".")}
           </text>
         ) : null,

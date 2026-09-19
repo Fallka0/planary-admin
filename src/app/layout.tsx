@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Onest } from "next/font/google";
 import { AuthProvider } from "@/components/AuthProvider";
 import { Shell } from "@/components/Shell";
+import { Providers } from "./providers";
 import "./globals.css";
 
 const ui = Onest({ variable: "--font-ui", subsets: ["latin"] });
@@ -13,11 +14,13 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
   return (
-    <html lang="en" className={ui.variable}>
-      <body>
-        <AuthProvider>
-          <Shell>{children}</Shell>
-        </AuthProvider>
+    <html lang="en" className={ui.variable} suppressHydrationWarning>
+      <body className="bg-background text-foreground font-[family-name:var(--font-ui)] antialiased">
+        <Providers>
+          <AuthProvider>
+            <Shell>{children}</Shell>
+          </AuthProvider>
+        </Providers>
       </body>
     </html>
   );

@@ -2,38 +2,66 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Button, Input, Label, ListBox, Select, Skeleton, Table } from "@heroui/react";
 import { Download } from "lucide-react";
+import { Empty } from "@/components/ui";
 import { type LedgerRow, useAdmin } from "@/lib/api";
 import { chips, dateTime, KIND_LABEL, signed } from "@/lib/format";
 
-function dayStart(value: string) {
-  return value ? new Date(`${value}T00:00:00`).getTime() : 0;
-}
+const dayStart = (value: string) => (value ? new Date(`${value}T00:00:00`).getTime() : 0);
 
 function toCsv(rows: LedgerRow[]) {
   const head = ["id", "time", "player_id", "player", "kind", "game", "amount", "reference", "counterparty"];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  return [head.join(","), ...rows.map((r) => [r.id, new Date(r.created_at).toISOString(), r.user_id, r.name, r.kind, r.game, r.amount, r.ref, r.counterparty_name].map(esc).join(","))].join("\n");
+  return [
+    head.join(","),
+    ...rows.map((r) =>
+      [r.id, new Date(r.created_at).toISOString(), r.user_id, r.name, r.kind, r.game, r.amount, r.ref, r.counterparty_name].map(esc).join(","),
+    ),
+  ].join("\n");
+}
+
+function Picker({ label, value, onChange, options }: { label: string; value: string; onChange: (v: string) => void; options: [string, string][] }) {
+  return (
+    <Select className="w-44" value={value} onChange={(v) => onChange(String(v))}>
+      <Label>{label}</Label>
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox>
+          {options.map(([id, text]) => (
+            <ListBox.Item key={id} id={id} textValue={text}>
+              {text}
+              <ListBox.ItemIndicator />
+            </ListBox.Item>
+          ))}
+        </ListBox>
+      </Select.Popover>
+    </Select>
+  );
 }
 
 export default function TransactionsPage() {
-  const [kind, setKind] = useState("");
-  const [game, setGame] = useState("");
+  const [kind, setKind] = useState("all");
+  const [game, setGame] = useState("all");
   const [from, setFrom] = useState("");
   const [to, setTo] = useState("");
   const [min, setMin] = useState("");
-  const [before, setBefore] = useState<number[]>([]);
-  const cursor = before[before.length - 1] ?? 0;
+  const [stack, setStack] = useState<number[]>([]);
+  const cursor = stack[stack.length - 1] ?? 0;
+
   const query = new URLSearchParams({
-    ...(kind ? { kind } : {}),
-    ...(game ? { game } : {}),
+    ...(kind !== "all" ? { kind } : {}),
+    ...(game !== "all" ? { game } : {}),
     ...(from ? { from: String(dayStart(from)) } : {}),
     ...(to ? { to: String(dayStart(to) + 86_400_000) } : {}),
     ...(min ? { min } : {}),
     ...(cursor ? { before: String(cursor) } : {}),
   });
   const { data } = useAdmin<{ entries: LedgerRow[]; more: boolean }>(`/ledger?${query}`);
-  const reset = () => setBefore([]);
+  const reset = () => setStack([]);
 
   function exportCsv() {
     if (!data) return;
@@ -47,100 +75,98 @@ export default function TransactionsPage() {
 
   return (
     <>
-      <div className="page-head">
+      <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1>Transactions</h1>
-          <p>Every chip movement in the casino, newest first. Nothing here can be edited; corrections are new adjustments.</p>
+          <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+          <p className="text-default-500">Every chip movement, newest first. Nothing here can be edited; corrections are new adjustments.</p>
         </div>
-        <button className="btn" onClick={exportCsv} disabled={!data?.entries.length}>
-          <Download size={14} aria-hidden="true" /> Export this page (CSV)
-        </button>
+        <Button variant="secondary" isDisabled={!data?.entries.length} onPress={exportCsv}>
+          <Download className="size-4" /> Export this page (CSV)
+        </Button>
+      </header>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <Picker
+          label="Type"
+          value={kind}
+          onChange={(v) => {
+            setKind(v);
+            reset();
+          }}
+          options={[["all", "All types"], ...(Object.entries(KIND_LABEL) as [string, string][])]}
+        />
+        <Picker
+          label="Game"
+          value={game}
+          onChange={(v) => {
+            setGame(v);
+            reset();
+          }}
+          options={[
+            ["all", "All games"],
+            ["blackjack", "Blackjack"],
+            ["roulette", "Roulette"],
+          ]}
+        />
+        <label className="grid gap-1.5 text-sm">
+          <span className="text-default-600 font-medium">From</span>
+          <Input type="date" value={from} onChange={(e) => (setFrom(e.target.value), reset())} className="w-40" />
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span className="text-default-600 font-medium">To</span>
+          <Input type="date" value={to} onChange={(e) => (setTo(e.target.value), reset())} className="w-40" />
+        </label>
+        <label className="grid gap-1.5 text-sm">
+          <span className="text-default-600 font-medium">Minimum chips</span>
+          <Input inputMode="numeric" value={min} onChange={(e) => (setMin(e.target.value.replace(/\D/g, "")), reset())} className="w-36" placeholder="Any" />
+        </label>
       </div>
-      <section className="card">
-        <div className="toolbar">
-          <select className="select" style={{ width: "auto" }} value={kind} onChange={(e) => (setKind(e.target.value), reset())} aria-label="Type">
-            <option value="">All types</option>
-            {Object.entries(KIND_LABEL).map(([k, label]) => (
-              <option key={k} value={k}>
-                {label}
-              </option>
-            ))}
-          </select>
-          <select className="select" style={{ width: "auto" }} value={game} onChange={(e) => (setGame(e.target.value), reset())} aria-label="Game">
-            <option value="">All games</option>
-            <option value="blackjack">Blackjack</option>
-            <option value="roulette">Roulette</option>
-          </select>
-          <label className="row small muted" style={{ alignItems: "center", gap: 6 }}>
-            From <input className="input" type="date" value={from} onChange={(e) => (setFrom(e.target.value), reset())} style={{ width: 150 }} />
-          </label>
-          <label className="row small muted" style={{ alignItems: "center", gap: 6 }}>
-            to <input className="input" type="date" value={to} onChange={(e) => (setTo(e.target.value), reset())} style={{ width: 150 }} />
-          </label>
-          <input
-            className="input"
-            style={{ width: 150 }}
-            inputMode="numeric"
-            value={min}
-            onChange={(e) => (setMin(e.target.value.replace(/\D/g, "")), reset())}
-            placeholder="Min. chips"
-            aria-label="Minimum amount"
-          />
-        </div>
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Player</th>
-                <th>Type</th>
-                <th className="hide-sm">Details</th>
-                <th className="r">Chips</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!data ? (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    Loading…
-                  </td>
-                </tr>
-              ) : data.entries.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    No transactions match.
-                  </td>
-                </tr>
-              ) : (
-                data.entries.map((r) => (
-                  <tr key={r.id}>
-                    <td className="muted num">{dateTime(r.created_at)}</td>
-                    <td>
-                      <Link href={`/players/${r.user_id}`} className="link">
+
+      {!data ? (
+        <Skeleton className="h-96 rounded-xl" />
+      ) : data.entries.length === 0 ? (
+        <Empty>No transactions match.</Empty>
+      ) : (
+        <Table>
+          <Table.ScrollContainer>
+            <Table.Content aria-label="Transactions" className="min-w-[760px]">
+              <Table.Header>
+                <Table.Column isRowHeader>When</Table.Column>
+                <Table.Column>Player</Table.Column>
+                <Table.Column>Type</Table.Column>
+                <Table.Column>Details</Table.Column>
+                <Table.Column>Chips</Table.Column>
+              </Table.Header>
+              <Table.Body>
+                {data.entries.map((r) => (
+                  <Table.Row key={r.id}>
+                    <Table.Cell className="num text-default-500">{dateTime(r.created_at)}</Table.Cell>
+                    <Table.Cell>
+                      <Link href={`/players/${r.user_id}`} className="text-accent font-medium hover:underline">
                         {r.name}
                       </Link>
-                    </td>
-                    <td>{r.kind === "game" ? `${r.game === "roulette" ? "Roulette" : "Blackjack"} ${r.amount < 0 ? "bet" : "payout"}` : (KIND_LABEL[r.kind] ?? r.kind)}</td>
-                    <td className="hide-sm muted">{r.counterparty_name ?? r.ref ?? ""}</td>
-                    <td className={`r ${r.amount >= 0 ? "up" : ""}`}>{signed(r.amount)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="toolbar" style={{ borderTop: "1px solid var(--line)", borderBottom: 0, justifyContent: "flex-end" }}>
-          <span className="small muted" style={{ marginRight: "auto" }}>
-            {data ? `${chips(data.entries.length)} rows` : ""}
-          </span>
-          <button className="btn btn-sm" disabled={!before.length} onClick={() => setBefore(before.slice(0, -1))}>
-            Newer
-          </button>
-          <button className="btn btn-sm" disabled={!data?.more} onClick={() => data && setBefore([...before, data.entries[data.entries.length - 1].id])}>
-            Older
-          </button>
-        </div>
-      </section>
+                    </Table.Cell>
+                    <Table.Cell>
+                      {r.kind === "game" ? `${r.game === "roulette" ? "Roulette" : "Blackjack"} ${r.amount < 0 ? "bet" : "payout"}` : (KIND_LABEL[r.kind] ?? r.kind)}
+                    </Table.Cell>
+                    <Table.Cell className="text-default-500">{r.counterparty_name ?? r.ref ?? ""}</Table.Cell>
+                    <Table.Cell className={`num font-medium ${r.amount >= 0 ? "text-success" : ""}`}>{signed(r.amount)}</Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+          <Table.Footer className="flex items-center justify-end gap-2">
+            <span className="text-default-500 mr-auto text-sm">{chips(data.entries.length)} rows</span>
+            <Button size="sm" variant="secondary" isDisabled={!stack.length} onPress={() => setStack(stack.slice(0, -1))}>
+              Newer
+            </Button>
+            <Button size="sm" variant="secondary" isDisabled={!data.more} onPress={() => setStack([...stack, data.entries[data.entries.length - 1].id])}>
+              Older
+            </Button>
+          </Table.Footer>
+        </Table>
+      )}
     </>
   );
 }

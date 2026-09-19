@@ -1,8 +1,10 @@
 "use client";
 
-import { useRouter, useSearchParams } from "next/navigation";
+import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useState } from "react";
-import { StatusPill, Who } from "@/components/ui";
+import { Button, Chip, Label, ListBox, SearchField, Select, Skeleton, Table } from "@heroui/react";
+import { Empty, StatusChip, Who } from "@/components/ui";
 import { type Badge, useAdmin } from "@/lib/api";
 import { ago, chips, date } from "@/lib/format";
 
@@ -15,8 +17,21 @@ interface Row extends Badge {
   joinedAt: number;
 }
 
+const FILTERS: [string, string][] = [
+  ["all", "All"],
+  ["online", "Online"],
+  ["restricted", "Restricted"],
+  ["muted", "Muted"],
+];
+
+const SORTS: [string, string][] = [
+  ["recent", "Last seen"],
+  ["balance", "Balance"],
+  ["joined", "Newest"],
+  ["name", "Name"],
+];
+
 function Players() {
-  const router = useRouter();
   const params = useSearchParams();
   const [q, setQ] = useState(params.get("q") ?? "");
   const [query, setQuery] = useState(params.get("q") ?? "");
@@ -31,6 +46,7 @@ function Players() {
     setQuery(next);
     setPage(0);
   }, [params]);
+
   useEffect(() => {
     const timer = window.setTimeout(() => {
       setQuery(q.trim());
@@ -46,101 +62,115 @@ function Players() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Players</h1>
-          <p>Search, open a player to see their history, adjust chips or restrict the account.</p>
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">Players</h1>
+        <p className="text-default-500">Search, then open a player to see their history, adjust chips or restrict the account.</p>
+      </header>
+
+      <div className="flex flex-wrap items-end gap-3">
+        <SearchField aria-label="Search players" value={q} onChange={setQ} className="min-w-56 flex-1">
+          <Label className="sr-only">Search players</Label>
+          <SearchField.Group>
+            <SearchField.SearchIcon />
+            <SearchField.Input placeholder="Name or player ID" />
+            <SearchField.ClearButton />
+          </SearchField.Group>
+        </SearchField>
+
+        <div role="group" aria-label="Filter" className="bg-default-100 flex gap-0.5 rounded-lg p-0.5">
+          {FILTERS.map(([value, label]) => (
+            <Button
+              key={value}
+              size="sm"
+              variant={status === value ? "secondary" : "ghost"}
+              aria-pressed={status === value}
+              onPress={() => {
+                setStatus(value);
+                setPage(0);
+              }}
+            >
+              {label}
+            </Button>
+          ))}
         </div>
+
+        <Select
+          className="w-44"
+          value={sort}
+          onChange={(value) => {
+            setSort(String(value));
+            setPage(0);
+          }}
+        >
+          <Label className="sr-only">Sort by</Label>
+          <Select.Trigger>
+            <Select.Value />
+            <Select.Indicator />
+          </Select.Trigger>
+          <Select.Popover>
+            <ListBox>
+              {SORTS.map(([value, label]) => (
+                <ListBox.Item key={value} id={value} textValue={label}>
+                  {label}
+                  <ListBox.ItemIndicator />
+                </ListBox.Item>
+              ))}
+            </ListBox>
+          </Select.Popover>
+        </Select>
       </div>
-      <section className="card">
-        <div className="toolbar">
-          <input className="input" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Name or player ID" aria-label="Search players" />
-          <div className="segmented" role="group" aria-label="Filter">
-            {[
-              ["all", "All"],
-              ["online", "Online"],
-              ["restricted", "Restricted"],
-              ["muted", "Muted"],
-            ].map(([value, label]) => (
-              <button
-                key={value}
-                aria-pressed={status === value}
-                onClick={() => {
-                  setStatus(value);
-                  setPage(0);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <select className="select" style={{ width: "auto", marginLeft: "auto" }} value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort by">
-            <option value="recent">Last seen</option>
-            <option value="balance">Balance</option>
-            <option value="joined">Newest</option>
-            <option value="name">Name</option>
-          </select>
-        </div>
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>Player</th>
-                <th>Status</th>
-                <th className="r">Balance</th>
-                <th className="hide-sm">Last seen</th>
-                <th className="hide-sm">Joined</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!data ? (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    Loading…
-                  </td>
-                </tr>
-              ) : data.players.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    No players match.
-                  </td>
-                </tr>
-              ) : (
-                data.players.map((p) => (
-                  <tr key={p.id} className="is-link" onClick={() => router.push(`/players/${p.id}`)}>
-                    <td>
-                      <a href={`/players/${p.id}`} onClick={(e) => e.preventDefault()}>
+
+      {!data ? (
+        <Skeleton className="h-96 rounded-xl" />
+      ) : data.players.length === 0 ? (
+        <Empty>No players match.</Empty>
+      ) : (
+        <Table>
+          <Table.ScrollContainer>
+            <Table.Content aria-label="Players" className="min-w-[720px]">
+              <Table.Header>
+                <Table.Column isRowHeader>Player</Table.Column>
+                <Table.Column>Status</Table.Column>
+                <Table.Column>Balance</Table.Column>
+                <Table.Column>Last seen</Table.Column>
+                <Table.Column>Joined</Table.Column>
+              </Table.Header>
+              <Table.Body>
+                {data.players.map((p) => (
+                  <Table.Row key={p.id}>
+                    <Table.Cell>
+                      <Link href={`/players/${p.id}`} className="rounded-lg outline-offset-4">
                         <Who player={p} sub={p.title ?? p.id.slice(0, 8)} />
-                      </a>
-                    </td>
-                    <td>
-                      <span className="row" style={{ gap: 6 }}>
-                        <StatusPill status={p.status} />
-                        {p.muted ? <StatusPill status="muted" /> : null}
-                        {p.online ? <span className="pill pill-good">Online</span> : null}
-                      </span>
-                    </td>
-                    <td className="r">{chips(p.balance)}</td>
-                    <td className="hide-sm muted">{ago(p.lastSeen, now)}</td>
-                    <td className="hide-sm muted">{date(p.joinedAt)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        {data && (page > 0 || data.more) ? (
-          <div className="toolbar" style={{ borderTop: "1px solid var(--line)", borderBottom: 0, justifyContent: "flex-end" }}>
-            <button className="btn btn-sm" disabled={page === 0} onClick={() => setPage(page - 1)}>
-              Previous
-            </button>
-            <span className="small muted">Page {page + 1}</span>
-            <button className="btn btn-sm" disabled={!data.more} onClick={() => setPage(page + 1)}>
-              Next
-            </button>
-          </div>
-        ) : null}
-      </section>
+                      </Link>
+                    </Table.Cell>
+                    <Table.Cell>
+                      <div className="flex flex-wrap gap-1.5">
+                        <StatusChip status={p.status} />
+                        {p.muted ? <StatusChip status="muted" /> : null}
+                        {p.online ? <Chip color="success">Online</Chip> : null}
+                      </div>
+                    </Table.Cell>
+                    <Table.Cell className="num font-medium">{chips(p.balance)}</Table.Cell>
+                    <Table.Cell className="text-default-500">{ago(p.lastSeen, now)}</Table.Cell>
+                    <Table.Cell className="text-default-500">{date(p.joinedAt)}</Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+          {page > 0 || data.more ? (
+            <Table.Footer className="flex items-center justify-end gap-2">
+              <span className="text-default-500 mr-auto text-sm">Page {page + 1}</span>
+              <Button size="sm" variant="secondary" isDisabled={page === 0} onPress={() => setPage(page - 1)}>
+                Previous
+              </Button>
+              <Button size="sm" variant="secondary" isDisabled={!data.more} onPress={() => setPage(page + 1)}>
+                Next
+              </Button>
+            </Table.Footer>
+          ) : null}
+        </Table>
+      )}
     </>
   );
 }

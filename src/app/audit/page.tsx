@@ -2,7 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Button, Code, Label, ListBox, Select, Skeleton, Table } from "@heroui/react";
 import { useStaff } from "@/components/Shell";
+import { Empty } from "@/components/ui";
 import { useAdmin } from "@/lib/api";
 import { dateTime } from "@/lib/format";
 
@@ -17,7 +19,7 @@ interface Entry {
 }
 
 const GROUPS: [string, string][] = [
-  ["", "Everything"],
+  ["all", "Everything"],
   ["chips", "Chips"],
   ["account", "Accounts"],
   ["chat", "Mutes"],
@@ -40,88 +42,95 @@ function detail(d: Record<string, unknown> | null) {
 
 export default function AuditPage() {
   const staff = useStaff();
-  const [action, setAction] = useState("");
-  const [before, setBefore] = useState<number[]>([]);
-  const cursor = before[before.length - 1];
+  const [action, setAction] = useState("all");
+  const [stack, setStack] = useState<number[]>([]);
+  const cursor = stack[stack.length - 1];
   const { data } = useAdmin<{ entries: Entry[]; more: boolean }>(
-    staff.can("audit") ? `/audit?${new URLSearchParams({ ...(action ? { action } : {}), ...(cursor ? { before: String(cursor) } : {}) })}` : null,
+    staff.can("audit") ? `/audit?${new URLSearchParams({ ...(action !== "all" ? { action } : {}), ...(cursor ? { before: String(cursor) } : {}) })}` : null,
   );
-  if (!staff.can("audit")) return <div className="card empty">Your role can&apos;t see the audit log.</div>;
+
+  if (!staff.can("audit")) return <Empty>Your role can&apos;t see the audit log.</Empty>;
+
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Audit log</h1>
-          <p>Every staff action, who did it and when. Entries can&apos;t be edited or removed.</p>
-        </div>
-      </div>
-      <section className="card">
-        <div className="toolbar">
-          <select className="select" style={{ width: "auto" }} value={action} onChange={(e) => (setAction(e.target.value), setBefore([]))} aria-label="Filter">
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">Audit log</h1>
+        <p className="text-default-500">Every staff action, who did it and when. Entries can&apos;t be edited or removed.</p>
+      </header>
+
+      <Select
+        className="w-52"
+        value={action}
+        onChange={(v) => {
+          setAction(String(v));
+          setStack([]);
+        }}
+      >
+        <Label>Filter</Label>
+        <Select.Trigger>
+          <Select.Value />
+          <Select.Indicator />
+        </Select.Trigger>
+        <Select.Popover>
+          <ListBox>
             {GROUPS.map(([value, label]) => (
-              <option key={value} value={value}>
+              <ListBox.Item key={value} id={value} textValue={label}>
                 {label}
-              </option>
+                <ListBox.ItemIndicator />
+              </ListBox.Item>
             ))}
-          </select>
-        </div>
-        <div className="table-wrap">
-          <table className="data">
-            <thead>
-              <tr>
-                <th>When</th>
-                <th>Staff</th>
-                <th>Action</th>
-                <th>On</th>
-                <th className="hide-sm">Details</th>
-              </tr>
-            </thead>
-            <tbody>
-              {!data ? (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    Loading…
-                  </td>
-                </tr>
-              ) : data.entries.length === 0 ? (
-                <tr>
-                  <td colSpan={5} className="empty">
-                    Nothing logged yet.
-                  </td>
-                </tr>
-              ) : (
-                data.entries.map((e) => (
-                  <tr key={e.id}>
-                    <td className="muted num">{dateTime(e.created_at)}</td>
-                    <td>{e.staff_name}</td>
-                    <td>
-                      <code className="code">{e.action}</code>
-                    </td>
-                    <td>
+          </ListBox>
+        </Select.Popover>
+      </Select>
+
+      {!data ? (
+        <Skeleton className="h-96 rounded-xl" />
+      ) : data.entries.length === 0 ? (
+        <Empty>Nothing logged yet.</Empty>
+      ) : (
+        <Table>
+          <Table.ScrollContainer>
+            <Table.Content aria-label="Audit log" className="min-w-[760px]">
+              <Table.Header>
+                <Table.Column isRowHeader>When</Table.Column>
+                <Table.Column>Staff</Table.Column>
+                <Table.Column>Action</Table.Column>
+                <Table.Column>On</Table.Column>
+                <Table.Column>Details</Table.Column>
+              </Table.Header>
+              <Table.Body>
+                {data.entries.map((e) => (
+                  <Table.Row key={e.id}>
+                    <Table.Cell className="num text-default-500">{dateTime(e.created_at)}</Table.Cell>
+                    <Table.Cell>{e.staff_name}</Table.Cell>
+                    <Table.Cell>
+                      <Code>{e.action}</Code>
+                    </Table.Cell>
+                    <Table.Cell>
                       {e.target_name ? (
-                        <Link className="link" href={`/players/${e.target_id}`}>
+                        <Link href={`/players/${e.target_id}`} className="text-accent font-medium hover:underline">
                           {e.target_name}
                         </Link>
                       ) : (
-                        <span className="muted">{e.target_id ?? "—"}</span>
+                        <span className="text-default-500">{e.target_id ?? "—"}</span>
                       )}
-                    </td>
-                    <td className="hide-sm muted small">{detail(e.details)}</td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
-        <div className="toolbar" style={{ borderTop: "1px solid var(--line)", borderBottom: 0, justifyContent: "flex-end" }}>
-          <button className="btn btn-sm" disabled={!before.length} onClick={() => setBefore(before.slice(0, -1))}>
-            Newer
-          </button>
-          <button className="btn btn-sm" disabled={!data?.more} onClick={() => data && setBefore([...before, data.entries[data.entries.length - 1].id])}>
-            Older
-          </button>
-        </div>
-      </section>
+                    </Table.Cell>
+                    <Table.Cell className="text-default-500 text-sm">{detail(e.details)}</Table.Cell>
+                  </Table.Row>
+                ))}
+              </Table.Body>
+            </Table.Content>
+          </Table.ScrollContainer>
+          <Table.Footer className="flex justify-end gap-2">
+            <Button size="sm" variant="secondary" isDisabled={!stack.length} onPress={() => setStack(stack.slice(0, -1))}>
+              Newer
+            </Button>
+            <Button size="sm" variant="secondary" isDisabled={!data.more} onPress={() => setStack([...stack, data.entries[data.entries.length - 1].id])}>
+              Older
+            </Button>
+          </Table.Footer>
+        </Table>
+      )}
     </>
   );
 }

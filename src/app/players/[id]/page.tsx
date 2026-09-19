@@ -2,9 +2,10 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
-import { ArrowLeft, Copy, ExternalLink } from "lucide-react";
+import { Alert, Button, Card, Chip, Description, Input, Label, Link as HeroLink, Modal, Separator, Skeleton, Table, Tabs, TextArea, TextField, toast } from "@heroui/react";
+import { ArrowLeft, Copy } from "lucide-react";
 import { useStaff } from "@/components/Shell";
-import { Avatar, Dialog, StatusPill, useToast } from "@/components/ui";
+import { Avatar, Empty, Loading, StatusChip } from "@/components/ui";
 import { ApiError, type Badge, type LedgerRow, useAdmin, useAdminAction } from "@/lib/api";
 import { chips, dateTime, KIND_LABEL, signed } from "@/lib/format";
 
@@ -29,7 +30,7 @@ interface Detail extends Badge {
   audit: { id: number; staff_name: string; action: string; details: string; created_at: number }[];
 }
 
-type Modal = "adjust" | "status" | "mute" | "limits" | null;
+type Sheet = "adjust" | "status" | "mute" | "limits" | null;
 
 const DAY = 86_400_000;
 
@@ -42,17 +43,11 @@ function describe(row: LedgerRow) {
   return base;
 }
 
-function toMs(value: string) {
-  return value ? new Date(`${value}T23:59:59`).getTime() : null;
-}
-
-function inDays(days: number) {
-  return new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
-}
+const toMs = (value: string) => (value ? new Date(`${value}T23:59:59`).getTime() : null);
+const inDays = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
 
 function useRun(onDone: () => void) {
   const act = useAdminAction();
-  const toast = useToast();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   async function run(path: string, body: unknown, done: string) {
@@ -60,7 +55,7 @@ function useRun(onDone: () => void) {
     setError(null);
     try {
       await act(path, body);
-      toast(done);
+      toast(done, { variant: "success" });
       onDone();
     } catch (e) {
       setError(e instanceof ApiError ? e.message : "That didn't work.");
@@ -71,92 +66,144 @@ function useRun(onDone: () => void) {
   return { run, error, busy };
 }
 
+/** One shell for every action dialog: heading, body, and the two footer buttons. */
+function ActionModal({
+  title,
+  onClose,
+  error,
+  children,
+  action,
+}: {
+  title: string;
+  onClose: () => void;
+  error: string | null;
+  children: React.ReactNode;
+  action: React.ReactNode;
+}) {
+  return (
+    <Modal.Backdrop isOpen onOpenChange={(open: boolean) => !open && onClose()}>
+        <Modal.Container>
+          <Modal.Dialog className="sm:max-w-[460px]">
+            <Modal.CloseTrigger />
+            <Modal.Header>
+              <Modal.Heading>{title}</Modal.Heading>
+            </Modal.Header>
+            <Modal.Body className="grid gap-4">
+              {children}
+              {error ? (
+                <Alert status="danger">
+                  <Alert.Indicator />
+                  <Alert.Content>
+                    <Alert.Description>{error}</Alert.Description>
+                  </Alert.Content>
+                </Alert>
+              ) : null}
+            </Modal.Body>
+            <Modal.Footer>
+              <Button variant="tertiary" onPress={onClose}>
+                Cancel
+              </Button>
+              {action}
+            </Modal.Footer>
+          </Modal.Dialog>
+        </Modal.Container>
+    </Modal.Backdrop>
+  );
+}
+
+function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: [T, string][]; label: string }) {
+  return (
+    <div role="group" aria-label={label} className="bg-default-100 flex gap-0.5 rounded-lg p-0.5">
+      {options.map(([key, text]) => (
+        <Button key={key} size="sm" className="flex-1" variant={value === key ? "secondary" : "ghost"} aria-pressed={value === key} onPress={() => onChange(key)}>
+          {text}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
 function AdjustDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
   const [direction, setDirection] = useState<"credit" | "debit">("credit");
   const [amount, setAmount] = useState("");
   const [reason, setReason] = useState("");
   const { run, error, busy } = useRun(onClose);
   const value = Number(amount) || 0;
+
   return (
-    <Dialog
+    <ActionModal
       title="Adjust chips"
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            disabled={busy || !value || reason.trim().length < 3}
-            onClick={() => void run(`/players/${p.id}/adjust`, { amount: direction === "credit" ? value : -value, reason }, "Balance adjusted")}
-          >
-            {direction === "credit" ? `Credit ${chips(value)}` : `Debit ${chips(value)}`}
-          </button>
-        </>
+      error={error}
+      action={
+        <Button
+          isPending={busy}
+          isDisabled={!value || reason.trim().length < 3}
+          onPress={() => void run(`/players/${p.id}/adjust`, { amount: direction === "credit" ? value : -value, reason }, "Balance adjusted")}
+        >
+          {direction === "credit" ? `Credit ${chips(value)}` : `Debit ${chips(value)}`}
+        </Button>
       }
     >
-      <p className="muted">
+      <p className="text-default-500">
         {p.name} has {chips(p.balance)} chips. The change is recorded in their history and the audit log, and they get a notification.
       </p>
-      <div className="segmented" role="group" aria-label="Direction">
-        <button aria-pressed={direction === "credit"} onClick={() => setDirection("credit")}>
-          Credit
-        </button>
-        <button aria-pressed={direction === "debit"} onClick={() => setDirection("debit")}>
-          Debit
-        </button>
-      </div>
-      <label className="field">
-        <span>Chips</span>
-        <input className="input" inputMode="numeric" value={amount} onChange={(e) => setAmount(e.target.value.replace(/\D/g, ""))} placeholder="e.g. 1000" />
-      </label>
-      <label className="field">
-        <span>Reason</span>
-        <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="e.g. Refund for a lost connection mid-round" />
-        <small>The player sees this.</small>
-      </label>
-      {error ? <p className="form-error">{error}</p> : null}
-    </Dialog>
+      <Segmented
+        label="Direction"
+        value={direction}
+        onChange={setDirection}
+        options={[
+          ["credit", "Credit"],
+          ["debit", "Debit"],
+        ]}
+      />
+      <TextField value={amount} onChange={(v) => setAmount(v.replace(/\D/g, ""))} inputMode="numeric">
+        <Label>Chips</Label>
+        <Input placeholder="e.g. 1000" />
+      </TextField>
+      <TextField value={reason} onChange={setReason} maxLength={200}>
+        <Label>Reason</Label>
+        <Input placeholder="e.g. Refund for a lost connection mid-round" />
+        <Description>The player sees this.</Description>
+      </TextField>
+    </ActionModal>
   );
 }
 
 function StatusDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
-  const [status, setStatus] = useState<"active" | "suspended" | "banned">(p.account.status === "banned" ? "banned" : p.status === "suspended" ? "suspended" : "active");
+  const [status, setStatus] = useState<"active" | "suspended" | "banned">(
+    p.account.status === "banned" ? "banned" : p.status === "suspended" ? "suspended" : "active",
+  );
   const [until, setUntil] = useState(inDays(7));
   const [reason, setReason] = useState(p.account.reason ?? "");
   const { run, error, busy } = useRun(onClose);
+
   return (
-    <Dialog
+    <ActionModal
       title="Account status"
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className={status === "active" ? "btn btn-primary" : "btn btn-danger-solid"}
-            disabled={busy}
-            onClick={() => void run(`/players/${p.id}/status`, { status, until: status === "suspended" ? toMs(until) : null, reason }, "Account updated")}
-          >
-            {status === "active" ? "Reactivate account" : status === "suspended" ? "Suspend account" : "Close account"}
-          </button>
-        </>
+      error={error}
+      action={
+        <Button
+          isPending={busy}
+          variant={status === "active" ? "primary" : "danger"}
+          onPress={() => void run(`/players/${p.id}/status`, { status, until: status === "suspended" ? toMs(until) : null, reason }, "Account updated")}
+        >
+          {status === "active" ? "Reactivate account" : status === "suspended" ? "Suspend account" : "Close account"}
+        </Button>
       }
     >
-      <div className="segmented" role="group" aria-label="Status">
-        <button aria-pressed={status === "active"} onClick={() => setStatus("active")}>
-          Active
-        </button>
-        <button aria-pressed={status === "suspended"} onClick={() => setStatus("suspended")}>
-          Suspended
-        </button>
-        <button aria-pressed={status === "banned"} onClick={() => setStatus("banned")}>
-          Closed
-        </button>
-      </div>
-      <p className="muted small">
+      <Segmented
+        label="Status"
+        value={status}
+        onChange={setStatus}
+        options={[
+          ["active", "Active"],
+          ["suspended", "Suspended"],
+          ["banned", "Closed"],
+        ]}
+      />
+      <p className="text-default-500 text-sm">
         {status === "active"
           ? "The player can use the casino normally."
           : status === "suspended"
@@ -164,20 +211,19 @@ function StatusDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
             : "Blocks the account until you reactivate it. Chips are kept."}
       </p>
       {status === "suspended" ? (
-        <label className="field">
-          <span>Until</span>
-          <input className="input" type="date" value={until} min={inDays(1)} onChange={(e) => setUntil(e.target.value)} />
-        </label>
+        <TextField value={until} onChange={setUntil} type="date">
+          <Label>Until</Label>
+          <Input min={inDays(1)} />
+        </TextField>
       ) : null}
       {status !== "active" ? (
-        <label className="field">
-          <span>Reason</span>
-          <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="e.g. Abusive chat" />
-          <small>The player sees this when they open the casino.</small>
-        </label>
+        <TextField value={reason} onChange={setReason} maxLength={200}>
+          <Label>Reason</Label>
+          <Input placeholder="e.g. Abusive chat" />
+          <Description>The player sees this when they open the casino.</Description>
+        </TextField>
       ) : null}
-      {error ? <p className="form-error">{error}</p> : null}
-    </Dialog>
+    </ActionModal>
   );
 }
 
@@ -185,38 +231,36 @@ function MuteDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
   const [until, setUntil] = useState(inDays(1));
   const [reason, setReason] = useState("");
   const { run, error, busy } = useRun(onClose);
+
   return (
-    <Dialog
+    <ActionModal
       title={p.mutedUntil ? "Chat mute" : "Mute chat"}
       onClose={onClose}
-      footer={
+      error={error}
+      action={
         <>
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
           {p.mutedUntil ? (
-            <button className="btn" disabled={busy} onClick={() => void run(`/players/${p.id}/mute`, { until: null }, "Mute lifted")}>
+            <Button variant="secondary" isPending={busy} onPress={() => void run(`/players/${p.id}/mute`, { until: null }, "Mute lifted")}>
               Lift mute
-            </button>
+            </Button>
           ) : null}
-          <button className="btn btn-primary" disabled={busy} onClick={() => void run(`/players/${p.id}/mute`, { until: toMs(until), reason }, "Player muted")}>
+          <Button isPending={busy} onPress={() => void run(`/players/${p.id}/mute`, { until: toMs(until), reason }, "Player muted")}>
             {p.mutedUntil ? "Change end date" : "Mute"}
-          </button>
+          </Button>
         </>
       }
     >
-      <p className="muted small">Stops table chat and direct messages. Playing is not affected.</p>
-      {p.mutedUntil ? <p className="small">Muted until {dateTime(p.mutedUntil)}.</p> : null}
-      <label className="field">
-        <span>Until</span>
-        <input className="input" type="date" value={until} min={inDays(0)} onChange={(e) => setUntil(e.target.value)} />
-      </label>
-      <label className="field">
-        <span>Note for the audit log</span>
-        <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} />
-      </label>
-      {error ? <p className="form-error">{error}</p> : null}
-    </Dialog>
+      <p className="text-default-500 text-sm">Stops table chat and direct messages. Playing is not affected.</p>
+      {p.mutedUntil ? <p className="text-sm">Muted until {dateTime(p.mutedUntil)}.</p> : null}
+      <TextField value={until} onChange={setUntil} type="date">
+        <Label>Until</Label>
+        <Input />
+      </TextField>
+      <TextField value={reason} onChange={setReason} maxLength={200}>
+        <Label>Note for the audit log</Label>
+        <Input />
+      </TextField>
+    </ActionModal>
   );
 }
 
@@ -225,43 +269,55 @@ function LimitsDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
   const [excluded, setExcluded] = useState(p.limits.excludedUntil ? new Date(p.limits.excludedUntil).toISOString().slice(0, 10) : "");
   const [reason, setReason] = useState("");
   const { run, error, busy } = useRun(onClose);
+
   return (
-    <Dialog
+    <ActionModal
       title="Responsible play"
       onClose={onClose}
-      footer={
-        <>
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className="btn btn-primary"
-            disabled={busy}
-            onClick={() =>
-              void run(`/players/${p.id}/limits`, { lossLimit: limit === "" ? null : Number(limit), excludedUntil: excluded ? toMs(excluded) : null, reason }, "Limits saved")
-            }
-          >
-            Save limits
-          </button>
-        </>
+      error={error}
+      action={
+        <Button
+          isPending={busy}
+          onPress={() =>
+            void run(
+              `/players/${p.id}/limits`,
+              { lossLimit: limit === "" ? null : Number(limit), excludedUntil: excluded ? toMs(excluded) : null, reason },
+              "Limits saved",
+            )
+          }
+        >
+          Save limits
+        </Button>
       }
     >
-      <label className="field">
-        <span>Daily loss limit (chips)</span>
-        <input className="input" inputMode="numeric" value={limit} onChange={(e) => setLimit(e.target.value.replace(/\D/g, ""))} placeholder="No limit" />
-        <small>Bets that would take today&apos;s losses past this are refused. Lost today: {chips(p.limits.lossToday)}.</small>
-      </label>
-      <label className="field">
-        <span>Break from play until</span>
-        <input className="input" type="date" value={excluded} min={inDays(1)} onChange={(e) => setExcluded(e.target.value)} />
-        <small>No bets until then. The player can still sign in, chat and see their profile. Leave empty for none.</small>
-      </label>
-      <label className="field">
-        <span>Note for the audit log</span>
-        <input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={200} placeholder="e.g. Requested by the player" />
-      </label>
-      {error ? <p className="form-error">{error}</p> : null}
-    </Dialog>
+      <TextField value={limit} onChange={(v) => setLimit(v.replace(/\D/g, ""))} inputMode="numeric">
+        <Label>Daily loss limit (chips)</Label>
+        <Input placeholder="No limit" />
+        <Description>Bets that would take today&apos;s losses past this are refused. Lost today: {chips(p.limits.lossToday)}.</Description>
+      </TextField>
+      <TextField value={excluded} onChange={setExcluded} type="date">
+        <Label>Break from play until</Label>
+        <Input min={inDays(1)} />
+        <Description>No bets until then. They can still sign in, chat and see their profile. Leave empty for none.</Description>
+      </TextField>
+      <TextField value={reason} onChange={setReason} maxLength={200}>
+        <Label>Note for the audit log</Label>
+        <Input placeholder="e.g. Requested by the player" />
+      </TextField>
+    </ActionModal>
+  );
+}
+
+function Stat({ rows }: { rows: [string, React.ReactNode][] }) {
+  return (
+    <dl className="divide-default-200 divide-y">
+      {rows.map(([label, value]) => (
+        <div key={label} className="flex items-center justify-between gap-4 py-2">
+          <dt className="text-default-500 text-sm">{label}</dt>
+          <dd className="num text-sm font-semibold">{value}</dd>
+        </div>
+      ))}
+    </dl>
   );
 }
 
@@ -270,32 +326,33 @@ function Notes({ p }: { p: Detail }) {
   const [body, setBody] = useState("");
   const { run, error, busy } = useRun(() => setBody(""));
   return (
-    <div className="card-body" style={{ display: "grid", gap: 14 }}>
+    <div className="grid gap-4">
       {staff.can("note") ? (
-        <form
-          style={{ display: "grid", gap: 8 }}
-          onSubmit={(e) => {
-            e.preventDefault();
-            void run(`/players/${p.id}/notes`, { body }, "Note added");
-          }}
-        >
-          <textarea className="textarea" value={body} onChange={(e) => setBody(e.target.value)} placeholder="Internal note, only staff see it" maxLength={2000} />
+        <div className="grid gap-2">
+          <TextArea
+            aria-label="New note"
+            className="min-h-24 w-full"
+            maxLength={2000}
+            placeholder="Internal note, only staff see it"
+            value={body}
+            onChange={(e) => setBody(e.target.value)}
+          />
           <div>
-            <button className="btn btn-primary btn-sm" disabled={busy || !body.trim()}>
+            <Button size="sm" isPending={busy} isDisabled={!body.trim()} onPress={() => void run(`/players/${p.id}/notes`, { body }, "Note added")}>
               Add note
-            </button>
+            </Button>
           </div>
-          {error ? <p className="form-error">{error}</p> : null}
-        </form>
+          {error ? <p className="text-danger text-sm">{error}</p> : null}
+        </div>
       ) : null}
       {p.notes.length === 0 ? (
-        <p className="muted">No notes yet.</p>
+        <Empty>No notes yet.</Empty>
       ) : (
-        <ul style={{ display: "grid", gap: 10 }}>
+        <ul className="grid gap-2">
           {p.notes.map((n) => (
-            <li key={n.id} className="note">
-              <p style={{ whiteSpace: "pre-wrap" }}>{n.body}</p>
-              <span className="small muted">
+            <li key={n.id} className="bg-default-100 grid gap-1 rounded-lg p-3">
+              <p className="whitespace-pre-wrap">{n.body}</p>
+              <span className="text-default-500 text-xs">
                 {n.staff_name} · {dateTime(n.created_at)}
               </span>
             </li>
@@ -311,38 +368,36 @@ function Ledger({ p }: { p: Detail }) {
   const { data } = useAdmin<{ entries: LedgerRow[] }>(before ? `/players/${p.id}/ledger?before=${before}` : null);
   const rows = before ? (data?.entries ?? []) : p.ledger;
   return (
-    <>
-      <div className="table-wrap">
-        <table className="data">
-          <thead>
-            <tr>
-              <th>When</th>
-              <th>What</th>
-              <th className="r">Chips</th>
-            </tr>
-          </thead>
-          <tbody>
+    <Table>
+      <Table.ScrollContainer>
+        <Table.Content aria-label="Chip history">
+          <Table.Header>
+            <Table.Column isRowHeader>When</Table.Column>
+            <Table.Column>What</Table.Column>
+            <Table.Column>Chips</Table.Column>
+          </Table.Header>
+          <Table.Body>
             {rows.map((r) => (
-              <tr key={r.id}>
-                <td className="muted num">{dateTime(r.created_at)}</td>
-                <td>{describe(r)}</td>
-                <td className={`r ${r.amount >= 0 ? "up" : ""}`}>{signed(r.amount)}</td>
-              </tr>
+              <Table.Row key={r.id}>
+                <Table.Cell className="num text-default-500">{dateTime(r.created_at)}</Table.Cell>
+                <Table.Cell>{describe(r)}</Table.Cell>
+                <Table.Cell className={`num font-medium ${r.amount >= 0 ? "text-success" : ""}`}>{signed(r.amount)}</Table.Cell>
+              </Table.Row>
             ))}
-          </tbody>
-        </table>
-      </div>
-      <div className="toolbar" style={{ borderTop: "1px solid var(--line)", borderBottom: 0, justifyContent: "flex-end" }}>
+          </Table.Body>
+        </Table.Content>
+      </Table.ScrollContainer>
+      <Table.Footer className="flex justify-end gap-2">
         {before ? (
-          <button className="btn btn-sm" onClick={() => setBefore(null)}>
+          <Button size="sm" variant="secondary" onPress={() => setBefore(null)}>
             Newest
-          </button>
+          </Button>
         ) : null}
-        <button className="btn btn-sm" disabled={rows.length < 50} onClick={() => setBefore(rows[rows.length - 1]?.id ?? null)}>
+        <Button size="sm" variant="secondary" isDisabled={rows.length < 50} onPress={() => setBefore(rows[rows.length - 1]?.id ?? null)}>
           Older
-        </button>
-      </div>
-    </>
+        </Button>
+      </Table.Footer>
+    </Table>
   );
 }
 
@@ -352,33 +407,36 @@ function Messages({ p }: { p: Detail }) {
   const { data: thread } = useAdmin<{ messages: { id: number; fromPlayer: boolean; body: string; at: number }[] }>(
     partner ? `/players/${p.id}/messages?with=${partner.id}` : null,
   );
-  if (!convos) return <p className="empty">Loading…</p>;
-  if (!convos.conversations.length) return <p className="empty">{p.name} hasn&apos;t messaged anyone.</p>;
+  if (!convos) return <Loading />;
+  if (!convos.conversations.length) return <Empty>{p.name} hasn&apos;t messaged anyone.</Empty>;
   return (
-    <div className="msg-split">
-      <ul className="list msg-list">
+    <div className="grid gap-4 md:grid-cols-[220px_minmax(0,1fr)]">
+      <ul className="border-default-200 grid content-start gap-0.5 md:border-r md:pr-2">
         {convos.conversations.map((c) => (
           <li key={c.with.id}>
-            <button className={`msg-pick${partner?.id === c.with.id ? " is-active" : ""}`} onClick={() => setPartner(c.with)}>
-              <Avatar player={c.with} size={28} />
-              <span>{c.with.name}</span>
-              <span className="muted small">{c.count}</span>
+            <button
+              className={`flex w-full items-center gap-2 rounded-lg p-2 text-left text-sm ${partner?.id === c.with.id ? "bg-default-100" : "hover:bg-default-100"}`}
+              onClick={() => setPartner(c.with)}
+            >
+              <Avatar player={c.with} size="sm" />
+              <span className="flex-1 truncate">{c.with.name}</span>
+              <span className="text-default-500 text-xs">{c.count}</span>
             </button>
           </li>
         ))}
       </ul>
-      <div className="msg-thread">
+      <div className="grid max-h-[26rem] content-start gap-2 overflow-y-auto">
         {!partner ? (
-          <p className="muted">Pick a conversation. Opening one is recorded in the audit log.</p>
+          <p className="text-default-500">Pick a conversation. Opening one is recorded in the audit log.</p>
         ) : !thread ? (
-          <p className="muted">Loading…</p>
+          <Loading />
         ) : (
           thread.messages.map((m) => (
-            <div key={m.id} className={`msg${m.fromPlayer ? " is-player" : ""}`}>
-              <span className="small muted">
+            <div key={m.id} className={`max-w-[80%] rounded-lg p-2.5 ${m.fromPlayer ? "bg-accent-soft justify-self-end" : "bg-default-100"}`}>
+              <span className="text-default-500 text-xs">
                 {m.fromPlayer ? p.name : partner.name} · {dateTime(m.at)}
               </span>
-              <p>{m.body}</p>
+              <p className="whitespace-pre-wrap">{m.body}</p>
             </div>
           ))
         )}
@@ -388,220 +446,20 @@ function Messages({ p }: { p: Detail }) {
 }
 
 const ACTION_LABEL: Record<string, string> = {
-  "chips.adjust": "Adjusted chips",
-  "account.active": "Reactivated account",
-  "account.suspended": "Suspended account",
-  "account.banned": "Closed account",
-  "chat.mute": "Muted chat",
-  "chat.unmute": "Lifted chat mute",
-  "limits.set": "Set limits",
-  "avatar.remove": "Removed picture",
-  "bio.remove": "Removed bio",
-  "note.add": "Added a note",
-  "messages.read": "Read messages",
-  "staff.set": "Changed staff role",
-  "staff.remove": "Removed from staff",
+  "chips.adjust": "adjusted chips",
+  "account.active": "reactivated the account",
+  "account.suspended": "suspended the account",
+  "account.banned": "closed the account",
+  "chat.mute": "muted chat",
+  "chat.unmute": "lifted the chat mute",
+  "limits.set": "set limits",
+  "avatar.remove": "removed the picture",
+  "bio.remove": "removed the bio",
+  "note.add": "added a note",
+  "messages.read": "read messages",
+  "staff.set": "changed a staff role",
+  "staff.remove": "removed staff access",
 };
-
-export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
-  const { id } = use(params);
-  const staff = useStaff();
-  const toast = useToast();
-  const act = useAdminAction();
-  const { data: p, error } = useAdmin<Detail>(`/players/${id}`, 30_000);
-  const [modal, setModal] = useState<Modal>(null);
-  const [now] = useState(() => Date.now());
-  const [tab, setTab] = useState<"summary" | "ledger" | "messages" | "notes" | "activity">("summary");
-
-  if (error) return <div className="card empty">{error.message}</div>;
-  if (!p) return <div className="card empty">Loading…</div>;
-
-  const s = p.stats;
-  const where = p.presence.online ? (p.presence.where === "lobby" ? "In the lobby" : `At ${p.presence.where}${p.presence.table ? ` · ${p.presence.table}` : ""}`) : "Offline";
-
-  return (
-    <>
-      <Link href="/players" className="btn btn-ghost btn-sm" style={{ justifySelf: "start" }}>
-        <ArrowLeft size={14} aria-hidden="true" /> Players
-      </Link>
-
-      <section className="card player-head">
-        <Avatar player={p} size={64} />
-        <div className="player-id">
-          <h1>{p.name}</h1>
-          <div className="row" style={{ gap: 6, alignItems: "center" }}>
-            <StatusPill status={p.status} />
-            {p.mutedUntil ? <StatusPill status="muted" /> : null}
-            <span className={`pill${p.presence.online ? " pill-good" : ""}`}>{where}</span>
-            {p.title ? <span className="pill">{p.title}</span> : null}
-          </div>
-          <button
-            className="btn btn-ghost btn-sm id-copy"
-            onClick={() => void navigator.clipboard.writeText(p.id).then(() => toast("Player ID copied"))}
-            title="Copy player ID"
-          >
-            <Copy size={12} aria-hidden="true" /> {p.id}
-          </button>
-        </div>
-        <div className="player-balance">
-          <span className="muted small">Balance</span>
-          <strong className="num">{chips(p.balance)}</strong>
-        </div>
-      </section>
-
-      {p.blockedReason ? <div className="banner-warn">{p.blockedReason}</div> : null}
-
-      <div className="page-actions">
-        {staff.can("chips") ? (
-          <button className="btn btn-primary" onClick={() => setModal("adjust")}>
-            Adjust chips
-          </button>
-        ) : null}
-        {staff.can("restrict") ? (
-          <>
-            <button className="btn" onClick={() => setModal("status")}>
-              Account status
-            </button>
-            <button className="btn" onClick={() => setModal("limits")}>
-              Responsible play
-            </button>
-          </>
-        ) : null}
-        {staff.can("moderate") ? (
-          <>
-            <button className="btn" onClick={() => setModal("mute")}>
-              {p.mutedUntil ? "Chat mute" : "Mute chat"}
-            </button>
-            {p.avatar ? (
-              <button
-                className="btn btn-danger"
-                onClick={() => void act(`/players/${p.id}/avatar/remove`).then(() => toast("Picture removed"), (e) => toast(e.message))}
-              >
-                Remove picture
-              </button>
-            ) : null}
-            {p.bio ? (
-              <button className="btn btn-danger" onClick={() => void act(`/players/${p.id}/bio/remove`).then(() => toast("Bio removed"), (e) => toast(e.message))}>
-                Remove bio
-              </button>
-            ) : null}
-          </>
-        ) : null}
-        <a className="btn btn-ghost" href={`https://casino.planary.ch/u/${p.id}`} target="_blank" rel="noreferrer">
-          Public profile <ExternalLink size={13} aria-hidden="true" />
-        </a>
-      </div>
-
-      <section className="card">
-        <div className="tabs" role="tablist">
-          {(
-            [
-              ["summary", "Summary"],
-              ["ledger", "Chip history"],
-              ...(staff.can("moderate") ? [["messages", "Messages"]] : []),
-              ["notes", `Notes${p.notes.length ? ` (${p.notes.length})` : ""}`],
-              ["activity", "Staff activity"],
-            ] as [typeof tab, string][]
-          ).map(([key, label]) => (
-            <button key={key} role="tab" aria-selected={tab === key} onClick={() => setTab(key)}>
-              {label}
-            </button>
-          ))}
-        </div>
-
-        {tab === "summary" ? (
-          <div className="grid-3 card-body">
-            <div>
-              <h3 className="sub-h">Money in and out</h3>
-              <dl className="kv">
-                <dt>Wagered</dt>
-                <dd>{chips(p.lifetime.wagered)}</dd>
-                <dt>Won back</dt>
-                <dd>{chips(p.lifetime.won)}</dd>
-                <dt>Net at the tables</dt>
-                <dd className={p.lifetime.net >= 0 ? "up" : "down"}>{signed(p.lifetime.net)}</dd>
-                <dt>Free chips</dt>
-                <dd>{chips(p.lifetime.free)}</dd>
-                <dt>Received / sent</dt>
-                <dd>
-                  {chips(p.lifetime.received)} / {chips(p.lifetime.sent)}
-                </dd>
-                <dt>Spent in shop</dt>
-                <dd>{chips(p.lifetime.shop)}</dd>
-                <dt>Staff adjustments</dt>
-                <dd>{signed(p.lifetime.adjustments)}</dd>
-              </dl>
-            </div>
-            <div>
-              <h3 className="sub-h">Play</h3>
-              <dl className="kv">
-                <dt>Blackjack rounds</dt>
-                <dd>{chips(s.bj_hands ?? 0)}</dd>
-                <dt>Blackjacks</dt>
-                <dd>{chips(s.bj_naturals ?? 0)}</dd>
-                <dt>Roulette spins</dt>
-                <dd>{chips(s.roulette_spins ?? 0)}</dd>
-                <dt>Best round</dt>
-                <dd>{signed(s.best_round ?? 0)}</dd>
-                <dt>Achievements</dt>
-                <dd>{p.achievements}</dd>
-                <dt>Friends</dt>
-                <dd>{p.friends}</dd>
-                <dt>Cosmetics owned</dt>
-                <dd>{p.items}</dd>
-              </dl>
-            </div>
-            <div>
-              <h3 className="sub-h">Account</h3>
-              <dl className="kv">
-                <dt>Joined</dt>
-                <dd>{dateTime(p.joinedAt)}</dd>
-                <dt>Last seen</dt>
-                <dd>{dateTime(p.lastSeen)}</dd>
-                <dt>Daily loss limit</dt>
-                <dd>{p.limits.lossLimit === null ? "None" : chips(p.limits.lossLimit)}</dd>
-                <dt>Lost today</dt>
-                <dd>{chips(p.limits.lossToday)}</dd>
-                <dt>Break until</dt>
-                <dd>{p.limits.excludedUntil && p.limits.excludedUntil > now ? dateTime(p.limits.excludedUntil) : "—"}</dd>
-                <dt>Chat muted until</dt>
-                <dd>{p.mutedUntil ? dateTime(p.mutedUntil) : "—"}</dd>
-              </dl>
-              {p.bio ? <p className="bio-quote">“{p.bio}”</p> : null}
-            </div>
-          </div>
-        ) : tab === "ledger" ? (
-          <Ledger p={p} />
-        ) : tab === "messages" ? (
-          <Messages p={p} />
-        ) : tab === "notes" ? (
-          <Notes p={p} />
-        ) : (
-          <ul className="list">
-            {p.audit.length === 0 ? (
-              <li className="muted">No staff actions on this player yet.</li>
-            ) : (
-              p.audit.map((a) => (
-                <li key={a.id}>
-                  <span style={{ flex: 1 }}>
-                    <strong>{a.staff_name}</strong> {ACTION_LABEL[a.action]?.toLowerCase() ?? a.action}
-                    {a.details && a.details !== "null" ? <span className="muted small"> · {summarise(a.details)}</span> : null}
-                  </span>
-                  <span className="muted small num">{dateTime(a.created_at)}</span>
-                </li>
-              ))
-            )}
-          </ul>
-        )}
-      </section>
-
-      {modal === "adjust" ? <AdjustDialog p={p} onClose={() => setModal(null)} /> : null}
-      {modal === "status" ? <StatusDialog p={p} onClose={() => setModal(null)} /> : null}
-      {modal === "mute" ? <MuteDialog p={p} onClose={() => setModal(null)} /> : null}
-      {modal === "limits" ? <LimitsDialog p={p} onClose={() => setModal(null)} /> : null}
-    </>
-  );
-}
 
 function summarise(details: string) {
   try {
@@ -613,4 +471,225 @@ function summarise(details: string) {
   } catch {
     return details;
   }
+}
+
+export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
+  const { id } = use(params);
+  const staff = useStaff();
+  const act = useAdminAction();
+  const { data: p, error } = useAdmin<Detail>(`/players/${id}`, 30_000);
+  const [modal, setModal] = useState<Sheet>(null);
+  const [now] = useState(() => Date.now());
+
+  if (error) return <Empty>{error.message}</Empty>;
+  if (!p) return <Skeleton className="h-96 rounded-xl" />;
+
+  const s = p.stats;
+  const where = p.presence.online
+    ? p.presence.where === "lobby"
+      ? "In the lobby"
+      : `At ${p.presence.where}${p.presence.table ? ` · ${p.presence.table}` : ""}`
+    : "Offline";
+  const remove = (what: "avatar" | "bio") =>
+    void act(`/players/${p.id}/${what}/remove`).then(
+      () => toast(what === "avatar" ? "Picture removed" : "Bio removed", { variant: "success" }),
+      (e) => toast(e.message, { variant: "danger" }),
+    );
+
+  return (
+    <>
+      <Link href="/players" className="text-default-500 hover:text-foreground flex w-fit items-center gap-1.5 text-sm">
+        <ArrowLeft className="size-4" /> Players
+      </Link>
+
+      <Card>
+        <Card.Content className="flex w-full flex-row flex-wrap items-center gap-4 p-5">
+          <Avatar player={p} size="lg" />
+          <div className="min-w-[14rem] flex-1 grid gap-1.5">
+            <h1 className="text-2xl font-bold tracking-tight">{p.name}</h1>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <StatusChip status={p.status} />
+              {p.mutedUntil ? <StatusChip status="muted" /> : null}
+              <Chip color={p.presence.online ? "success" : "default"}>{where}</Chip>
+              {p.title ? <Chip>{p.title}</Chip> : null}
+            </div>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-default-500 w-fit font-mono text-xs"
+              onPress={() => void navigator.clipboard.writeText(p.id).then(() => toast("Player ID copied"))}
+            >
+              <Copy className="size-3" /> {p.id}
+            </Button>
+          </div>
+          <div className="text-right">
+            <span className="text-default-500 text-sm">Balance</span>
+            <div className="num text-3xl font-bold tracking-tight">{chips(p.balance)}</div>
+          </div>
+        </Card.Content>
+      </Card>
+
+      {p.blockedReason ? (
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{p.blockedReason}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
+
+      <div className="flex flex-wrap gap-2">
+        {staff.can("chips") ? <Button onPress={() => setModal("adjust")}>Adjust chips</Button> : null}
+        {staff.can("restrict") ? (
+          <>
+            <Button variant="secondary" onPress={() => setModal("status")}>
+              Account status
+            </Button>
+            <Button variant="secondary" onPress={() => setModal("limits")}>
+              Responsible play
+            </Button>
+          </>
+        ) : null}
+        {staff.can("moderate") ? (
+          <>
+            <Button variant="secondary" onPress={() => setModal("mute")}>
+              {p.mutedUntil ? "Chat mute" : "Mute chat"}
+            </Button>
+            {p.avatar ? (
+              <Button variant="danger-soft" onPress={() => remove("avatar")}>
+                Remove picture
+              </Button>
+            ) : null}
+            {p.bio ? (
+              <Button variant="danger-soft" onPress={() => remove("bio")}>
+                Remove bio
+              </Button>
+            ) : null}
+          </>
+        ) : null}
+        <HeroLink href={`https://casino.planary.ch/u/${p.id}`} target="_blank" rel="noreferrer" className="text-default-600 ml-auto self-center text-sm">
+          Public profile
+          <HeroLink.Icon />
+        </HeroLink>
+      </div>
+
+      <Card>
+        <Tabs defaultSelectedKey="summary">
+          <Tabs.ListContainer className="px-3">
+            <Tabs.List aria-label="Player details">
+              <Tabs.Tab id="summary">
+                Summary
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab id="ledger">
+                Chip history
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              {staff.can("moderate") ? (
+                <Tabs.Tab id="messages">
+                  Messages
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+              ) : null}
+              <Tabs.Tab id="notes">
+                Notes{p.notes.length ? ` (${p.notes.length})` : ""}
+                <Tabs.Indicator />
+              </Tabs.Tab>
+              <Tabs.Tab id="activity">
+                Staff activity
+                <Tabs.Indicator />
+              </Tabs.Tab>
+            </Tabs.List>
+          </Tabs.ListContainer>
+
+          <Tabs.Panel id="summary" className="grid gap-6 p-5 lg:grid-cols-3">
+            <section>
+              <h2 className="text-default-500 mb-1 text-xs font-semibold tracking-wide uppercase">Money in and out</h2>
+              <Stat
+                rows={[
+                  ["Wagered", chips(p.lifetime.wagered)],
+                  ["Won back", chips(p.lifetime.won)],
+                  ["Net at the tables", <span key="net" className={p.lifetime.net >= 0 ? "text-success" : "text-danger"}>{signed(p.lifetime.net)}</span>],
+                  ["Free chips", chips(p.lifetime.free)],
+                  ["Received / sent", `${chips(p.lifetime.received)} / ${chips(p.lifetime.sent)}`],
+                  ["Spent in shop", chips(p.lifetime.shop)],
+                  ["Staff adjustments", signed(p.lifetime.adjustments)],
+                ]}
+              />
+            </section>
+            <section>
+              <h2 className="text-default-500 mb-1 text-xs font-semibold tracking-wide uppercase">Play</h2>
+              <Stat
+                rows={[
+                  ["Blackjack rounds", chips(s.bj_hands ?? 0)],
+                  ["Blackjacks", chips(s.bj_naturals ?? 0)],
+                  ["Roulette spins", chips(s.roulette_spins ?? 0)],
+                  ["Best round", signed(s.best_round ?? 0)],
+                  ["Achievements", p.achievements],
+                  ["Friends", p.friends],
+                  ["Cosmetics owned", p.items],
+                ]}
+              />
+            </section>
+            <section>
+              <h2 className="text-default-500 mb-1 text-xs font-semibold tracking-wide uppercase">Account</h2>
+              <Stat
+                rows={[
+                  ["Joined", dateTime(p.joinedAt)],
+                  ["Last seen", dateTime(p.lastSeen)],
+                  ["Daily loss limit", p.limits.lossLimit === null ? "None" : chips(p.limits.lossLimit)],
+                  ["Lost today", chips(p.limits.lossToday)],
+                  ["Break until", p.limits.excludedUntil && p.limits.excludedUntil > now ? dateTime(p.limits.excludedUntil) : "—"],
+                  ["Chat muted until", p.mutedUntil ? dateTime(p.mutedUntil) : "—"],
+                ]}
+              />
+              {p.bio ? (
+                <>
+                  <Separator className="my-3" />
+                  <p className="text-default-600 border-default-300 border-l-2 pl-3 italic">“{p.bio}”</p>
+                </>
+              ) : null}
+            </section>
+          </Tabs.Panel>
+
+          <Tabs.Panel id="ledger">
+            <Ledger p={p} />
+          </Tabs.Panel>
+
+          {staff.can("moderate") ? (
+            <Tabs.Panel id="messages" className="p-5">
+              <Messages p={p} />
+            </Tabs.Panel>
+          ) : null}
+
+          <Tabs.Panel id="notes" className="p-5">
+            <Notes p={p} />
+          </Tabs.Panel>
+
+          <Tabs.Panel id="activity" className="p-5">
+            {p.audit.length === 0 ? (
+              <Empty>No staff actions on this player yet.</Empty>
+            ) : (
+              <ul className="divide-default-200 divide-y">
+                {p.audit.map((a) => (
+                  <li key={a.id} className="flex flex-wrap items-center justify-between gap-2 py-2.5">
+                    <span>
+                      <strong>{a.staff_name}</strong> {ACTION_LABEL[a.action] ?? a.action}
+                      {a.details && a.details !== "null" ? <span className="text-default-500 text-sm"> · {summarise(a.details)}</span> : null}
+                    </span>
+                    <span className="text-default-500 num text-sm">{dateTime(a.created_at)}</span>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </Tabs.Panel>
+        </Tabs>
+      </Card>
+
+      {modal === "adjust" ? <AdjustDialog p={p} onClose={() => setModal(null)} /> : null}
+      {modal === "status" ? <StatusDialog p={p} onClose={() => setModal(null)} /> : null}
+      {modal === "mute" ? <MuteDialog p={p} onClose={() => setModal(null)} /> : null}
+      {modal === "limits" ? <LimitsDialog p={p} onClose={() => setModal(null)} /> : null}
+    </>
+  );
 }

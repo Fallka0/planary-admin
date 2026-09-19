@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useState } from "react";
+import { Alert, Button, Card, Chip, Description, Input, Label, Link as HeroLink, Modal, Skeleton, Table, TextField, toast } from "@heroui/react";
 import { useStaff } from "@/components/Shell";
-import { Avatar, Dialog, StatusPill, useToast } from "@/components/ui";
+import { Avatar, StatusChip } from "@/components/ui";
 import { ApiError, type Badge, type Figures, useAdmin, useAdminAction } from "@/lib/api";
 import { chips, pct, signed } from "@/lib/format";
 
@@ -27,59 +28,78 @@ const RULES: Record<string, string> = {
 
 function StatusDialog({ g, onClose }: { g: Game; onClose: () => void }) {
   const act = useAdminAction();
-  const toast = useToast();
   const closing = g.status === "open";
   const [note, setNote] = useState(g.note ?? "");
   const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function save() {
+    setBusy(true);
+    setError(null);
+    try {
+      await act(`/games/${g.game}`, { status: closing ? "maintenance" : "open", note: closing ? note : "" });
+      toast(closing ? `${NAME[g.game]} closed` : `${NAME[g.game]} reopened`, { variant: "success" });
+      onClose();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "That didn't work.");
+      setBusy(false);
+    }
+  }
+
   return (
-    <Dialog
-      title={closing ? `Close ${NAME[g.game]}` : `Reopen ${NAME[g.game]}`}
-      onClose={onClose}
-      footer={
-        <>
-          <button className="btn" onClick={onClose}>
-            Cancel
-          </button>
-          <button
-            className={closing ? "btn btn-danger-solid" : "btn btn-primary"}
-            onClick={() =>
-              void act(`/games/${g.game}`, { status: closing ? "maintenance" : "open", note: closing ? note : "" }).then(
-                () => (toast(closing ? "Game closed" : "Game reopened"), onClose()),
-                (e) => setError(e instanceof ApiError ? e.message : "That didn't work."),
-              )
-            }
-          >
-            {closing ? "Close for maintenance" : "Reopen"}
-          </button>
-        </>
-      }
-    >
-      {closing ? (
-        <>
-          <p className="muted">Rounds already dealt finish normally. After that, new bets are refused with the message below until you reopen.</p>
-          <label className="field">
-            <span>Message for players</span>
-            <input className="input" value={note} onChange={(e) => setNote(e.target.value)} maxLength={200} placeholder="This game is closed for maintenance. Try again soon." />
-          </label>
-        </>
-      ) : (
-        <p className="muted">Players can bet again right away.</p>
-      )}
-      {error ? <p className="form-error">{error}</p> : null}
-    </Dialog>
+    <Modal.Backdrop isOpen onOpenChange={(open: boolean) => !open && onClose()}>
+      <Modal.Container>
+        <Modal.Dialog className="sm:max-w-[440px]">
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Heading>{closing ? `Close ${NAME[g.game]}` : `Reopen ${NAME[g.game]}`}</Modal.Heading>
+          </Modal.Header>
+          <Modal.Body className="grid gap-4">
+            {closing ? (
+              <>
+                <p className="text-default-500">Rounds already dealt finish normally. After that, new bets are refused with the message below.</p>
+                <TextField value={note} onChange={setNote} maxLength={200}>
+                  <Label>Message for players</Label>
+                  <Input placeholder="This game is closed for maintenance. Try again soon." />
+                  <Description>Leave empty to use the default message.</Description>
+                </TextField>
+              </>
+            ) : (
+              <p className="text-default-500">Players can bet again right away.</p>
+            )}
+            {error ? (
+              <Alert status="danger">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Description>{error}</Alert.Description>
+                </Alert.Content>
+              </Alert>
+            ) : null}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="tertiary" onPress={onClose}>
+              Cancel
+            </Button>
+            <Button variant={closing ? "danger" : "primary"} isPending={busy} onPress={() => void save()}>
+              {closing ? "Close for maintenance" : "Reopen"}
+            </Button>
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
   );
 }
 
 function Row({ label, f }: { label: string; f: Figures }) {
   return (
-    <tr>
-      <td>{label}</td>
-      <td className="r">{chips(f.handle)}</td>
-      <td className="r">{chips(f.bets)}</td>
-      <td className="r">{chips(f.players)}</td>
-      <td className={`r ${f.ggr >= 0 ? "up" : "down"}`}>{signed(f.ggr)}</td>
-      <td className="r">{pct(f.rtp)}</td>
-    </tr>
+    <Table.Row>
+      <Table.Cell>{label}</Table.Cell>
+      <Table.Cell className="num">{chips(f.handle)}</Table.Cell>
+      <Table.Cell className="num">{chips(f.bets)}</Table.Cell>
+      <Table.Cell className="num">{chips(f.players)}</Table.Cell>
+      <Table.Cell className={`num font-medium ${f.ggr >= 0 ? "text-success" : "text-danger"}`}>{signed(f.ggr)}</Table.Cell>
+      <Table.Cell className="num">{pct(f.rtp)}</Table.Cell>
+    </Table.Row>
   );
 }
 
@@ -90,67 +110,75 @@ export default function GamesPage() {
 
   return (
     <>
-      <div className="page-head">
-        <div>
-          <h1>Games</h1>
-          <p>Status, results against the expected return, and who is at a table right now.</p>
-        </div>
-      </div>
+      <header>
+        <h1 className="text-2xl font-bold tracking-tight">Games</h1>
+        <p className="text-default-500">Status, results against the expected return, and who is at a table right now.</p>
+      </header>
+
       {!data ? (
-        <div className="card empty">Loading…</div>
+        <Skeleton className="h-96 rounded-xl" />
       ) : (
         data.games.map((g) => (
-          <section key={g.game} className="card">
-            <div className="card-head">
+          <Card key={g.game}>
+            <Card.Header>
+              <div className="flex w-full flex-wrap items-start justify-between gap-3">
               <div>
-                <h2 className="row" style={{ alignItems: "center", gap: 8 }}>
-                  {NAME[g.game]} <StatusPill status={g.status} />
-                </h2>
-                <p>{g.status === "maintenance" && g.note ? `Players see: “${g.note}”` : RULES[g.game]}</p>
+                <Card.Title className="flex items-center gap-2">
+                  {NAME[g.game]} <StatusChip status={g.status} />
+                </Card.Title>
+                <Card.Description>{g.status === "maintenance" && g.note ? `Players see: “${g.note}”` : RULES[g.game]}</Card.Description>
               </div>
-              <div className="page-actions">
-                <a className="btn btn-sm" href={HOST[g.game]} target="_blank" rel="noreferrer">
+              <div className="flex items-center gap-3">
+                <HeroLink href={HOST[g.game]} target="_blank" rel="noreferrer" className="text-default-600 text-sm">
                   Open game
-                </a>
+                  <HeroLink.Icon />
+                </HeroLink>
                 {staff.can("games") ? (
-                  <button className={g.status === "open" ? "btn btn-sm btn-danger" : "btn btn-sm btn-primary"} onClick={() => setEditing(g)}>
+                  <Button size="sm" variant={g.status === "open" ? "danger-soft" : "primary"} onPress={() => setEditing(g)}>
                     {g.status === "open" ? "Close for maintenance" : "Reopen"}
-                  </button>
+                  </Button>
                 ) : null}
               </div>
-            </div>
-            <div className="table-wrap">
-              <table className="data">
-                <thead>
-                  <tr>
-                    <th>Period</th>
-                    <th className="r">Wagered</th>
-                    <th className="r">Bets</th>
-                    <th className="r">Players</th>
-                    <th className="r">House result</th>
-                    <th className="r">RTP (expected {pct(g.theoretical)})</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <Row label="Today" f={g.today} />
-                  <Row label="7 days" f={g.week} />
-                  <Row label="30 days" f={g.month} />
-                </tbody>
-              </table>
-            </div>
-            <div className="card-body">
-              <h3 className="sub-h">Live now</h3>
+              </div>
+            </Card.Header>
+            <Card.Content className="px-0">
+              <Table>
+                <Table.ScrollContainer>
+                  <Table.Content aria-label={`${NAME[g.game]} figures`} className="min-w-[640px]">
+                    <Table.Header>
+                      <Table.Column isRowHeader>Period</Table.Column>
+                      <Table.Column>Wagered</Table.Column>
+                      <Table.Column>Bets</Table.Column>
+                      <Table.Column>Players</Table.Column>
+                      <Table.Column>House result</Table.Column>
+                      <Table.Column>RTP (expected {pct(g.theoretical)})</Table.Column>
+                    </Table.Header>
+                    <Table.Body>
+                      <Row label="Today" f={g.today} />
+                      <Row label="7 days" f={g.week} />
+                      <Row label="30 days" f={g.month} />
+                    </Table.Body>
+                  </Table.Content>
+                </Table.ScrollContainer>
+              </Table>
+            </Card.Content>
+            <Card.Footer className="grid w-full gap-2">
+              <h3 className="text-default-500 text-xs font-semibold tracking-wide uppercase">Live now</h3>
               {g.tables.length === 0 ? (
-                <p className="muted">Nobody is playing right now.</p>
+                <p className="text-default-500 text-sm">Nobody is playing right now.</p>
               ) : (
-                <ul className="live-tables">
+                <ul className="grid gap-2">
                   {g.tables.map((t) => (
-                    <li key={t.id}>
-                      <span className="small muted">{t.id === "lobby" ? "In the lobby" : `Table ${t.id}${t.id.startsWith("p-") ? " (private)" : ""}`}</span>
-                      <span className="row" style={{ gap: 6 }}>
-                        {t.players.map((p) => (
-                          <Link key={p.id} href={`/players/${p.id}`} className="pill" title={p.name}>
-                            <Avatar player={p} size={16} /> {p.name}
+                    <li key={t.id} className="bg-default-100 grid gap-1.5 rounded-lg p-3">
+                      <span className="text-default-500 text-xs">
+                        {t.id === "lobby" ? "In the lobby" : `Table ${t.id}${t.id.startsWith("p-") ? " (private)" : ""}`}
+                      </span>
+                      <span className="flex flex-wrap gap-1.5">
+                        {t.players.map((pl) => (
+                          <Link key={pl.id} href={`/players/${pl.id}`}>
+                            <Chip>
+                              <Avatar player={pl} size="xs" /> {pl.name}
+                            </Chip>
                           </Link>
                         ))}
                       </span>
@@ -158,8 +186,8 @@ export default function GamesPage() {
                   ))}
                 </ul>
               )}
-            </div>
-          </section>
+            </Card.Footer>
+          </Card>
         ))
       )}
       {editing ? <StatusDialog g={editing} onClose={() => setEditing(null)} /> : null}
