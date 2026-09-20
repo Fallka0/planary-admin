@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import {
   Coins,
   Gamepad2,
+  Layers,
   LayoutDashboard,
   LogOut,
   Megaphone,
@@ -39,6 +40,7 @@ const NAV: { label: string; items: { href: string; label: string; icon: typeof U
     items: [
       { href: "/", label: "Overview", icon: LayoutDashboard },
       { href: "/games", label: "Games", icon: Gamepad2 },
+      { href: "/rounds", label: "Game rounds", icon: Layers },
       { href: "/transactions", label: "Transactions", icon: ReceiptText },
     ],
   },

@@ -117,3 +117,37 @@ export interface LedgerRow {
   created_at: number;
   counterparty_name: string | null;
 }
+
+/** A game round as the archive stores it: what happened, and the proof it was fair. */
+export interface RoundProof {
+  hash: string;
+  clientSeed: string;
+  nonce: number;
+  serverSeed: string | null;
+  kind: string;
+}
+
+export interface RoundRow {
+  id: string;
+  game: string;
+  tableId: string;
+  startedAt: number;
+  endedAt: number;
+  outcome: string;
+  staked: number;
+  returned: number;
+  seats: number;
+  proof: RoundProof;
+}
+
+export interface RoundDetail extends RoundRow {
+  log: Record<string, unknown> | null;
+  players: {
+    userId: string;
+    name: string | null;
+    seat: number;
+    staked: number;
+    returned: number;
+    detail: Record<string, unknown>;
+  }[];
+}
