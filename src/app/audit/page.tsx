@@ -30,6 +30,7 @@ const GROUPS: [string, string][] = [
   ["shop", "Shop"],
   ["announcement", "Announcements"],
   ["staff", "Staff"],
+  ["rounds", "Record retention"],
 ];
 
 function detail(d: Record<string, unknown> | null) {
@@ -55,7 +56,10 @@ export default function AuditPage() {
     <>
       <header>
         <h1 className="text-2xl font-bold tracking-tight">Audit log</h1>
-        <p className="text-default-500">Every staff action, who did it and when. Entries can&apos;t be edited or removed.</p>
+        <p className="text-default-500">
+          Every action that changes something, who did it and when — including the weekly sweep that deletes game records past their
+          retention. Entries can&apos;t be edited or removed.
+        </p>
       </header>
 
       <Select
