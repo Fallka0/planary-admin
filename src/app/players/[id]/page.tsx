@@ -2,11 +2,12 @@
 
 import Link from "next/link";
 import { use, useState } from "react";
-import { Alert, Button, Card, Chip, Description, Input, Label, Link as HeroLink, Modal, Separator, Skeleton, Table, Tabs, TextArea, TextField, toast } from "@heroui/react";
+import { Alert, Button, Card, Chip, Description, Input, Label, Link as HeroLink, Separator, Skeleton, Table, Tabs, TextArea, TextField, toast } from "@heroui/react";
 import { ArrowLeft, Copy } from "lucide-react";
 import { useStaff } from "@/components/Shell";
-import { Avatar, Empty, Loading, StatusChip } from "@/components/ui";
-import { ApiError, type Badge, type LedgerRow, useAdmin, useAdminAction } from "@/lib/api";
+import { ActionModal, Avatar, Empty, Loading, Segmented, StatusChip, useRun } from "@/components/ui";
+import { ProgressPanel, ResetDialog } from "./progress";
+import { type Badge, type LedgerRow, useAdmin, useAdminAction } from "@/lib/api";
 import { chips, dateTime, KIND_LABEL, signed } from "@/lib/format";
 
 interface Detail extends Badge {
@@ -30,7 +31,7 @@ interface Detail extends Badge {
   audit: { id: number; staff_name: string; action: string; details: string; created_at: number }[];
 }
 
-type Sheet = "adjust" | "status" | "mute" | "limits" | null;
+type Sheet = "adjust" | "status" | "mute" | "limits" | "reset" | null;
 
 const DAY = 86_400_000;
 
@@ -45,83 +46,6 @@ function describe(row: LedgerRow) {
 
 const toMs = (value: string) => (value ? new Date(`${value}T23:59:59`).getTime() : null);
 const inDays = (days: number) => new Date(Date.now() + days * DAY).toISOString().slice(0, 10);
-
-function useRun(onDone: () => void) {
-  const act = useAdminAction();
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  async function run(path: string, body: unknown, done: string) {
-    setBusy(true);
-    setError(null);
-    try {
-      await act(path, body);
-      toast(done, { variant: "success" });
-      onDone();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "That didn't work.");
-    } finally {
-      setBusy(false);
-    }
-  }
-  return { run, error, busy };
-}
-
-/** One shell for every action dialog: heading, body, and the two footer buttons. */
-function ActionModal({
-  title,
-  onClose,
-  error,
-  children,
-  action,
-}: {
-  title: string;
-  onClose: () => void;
-  error: string | null;
-  children: React.ReactNode;
-  action: React.ReactNode;
-}) {
-  return (
-    <Modal.Backdrop isOpen onOpenChange={(open: boolean) => !open && onClose()}>
-        <Modal.Container>
-          <Modal.Dialog className="sm:max-w-[460px]">
-            <Modal.CloseTrigger />
-            <Modal.Header>
-              <Modal.Heading>{title}</Modal.Heading>
-            </Modal.Header>
-            <Modal.Body className="grid gap-4">
-              {children}
-              {error ? (
-                <Alert status="danger">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Description>{error}</Alert.Description>
-                  </Alert.Content>
-                </Alert>
-              ) : null}
-            </Modal.Body>
-            <Modal.Footer>
-              <Button variant="tertiary" onPress={onClose}>
-                Cancel
-              </Button>
-              {action}
-            </Modal.Footer>
-          </Modal.Dialog>
-        </Modal.Container>
-    </Modal.Backdrop>
-  );
-}
-
-function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: [T, string][]; label: string }) {
-  return (
-    <div role="group" aria-label={label} className="bg-default-100 flex gap-0.5 rounded-lg p-0.5">
-      {options.map(([key, text]) => (
-        <Button key={key} size="sm" className="flex-1" variant={value === key ? "secondary" : "ghost"} aria-pressed={value === key} onPress={() => onChange(key)}>
-          {text}
-        </Button>
-      ))}
-    </div>
-  );
-}
 
 function AdjustDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
   const [direction, setDirection] = useState<"credit" | "debit">("credit");
@@ -456,6 +380,9 @@ const ACTION_LABEL: Record<string, string> = {
   "avatar.remove": "removed the picture",
   "bio.remove": "removed the bio",
   "note.add": "added a note",
+  "progress.achievements": "changed achievements",
+  "progress.stats": "set counters",
+  "account.reset": "reset the account",
   "messages.read": "read messages",
   "staff.set": "changed a staff role",
   "staff.remove": "removed staff access",
@@ -567,6 +494,11 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
             ) : null}
           </>
         ) : null}
+        {staff.can("reset") ? (
+          <Button variant="danger" onPress={() => setModal("reset")}>
+            Reset account
+          </Button>
+        ) : null}
         <HeroLink href={`https://casino.planary.ch/u/${p.id}`} target="_blank" rel="noreferrer" className="text-default-600 ml-auto self-center text-sm">
           Public profile
           <HeroLink.Icon />
@@ -595,6 +527,12 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
                 Notes{p.notes.length ? ` (${p.notes.length})` : ""}
                 <Tabs.Indicator />
               </Tabs.Tab>
+              {staff.can("reset") ? (
+                <Tabs.Tab id="progress">
+                  Progress
+                  <Tabs.Indicator />
+                </Tabs.Tab>
+              ) : null}
               <Tabs.Tab id="activity">
                 Staff activity
                 <Tabs.Indicator />
@@ -666,6 +604,12 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
             <Notes p={p} />
           </Tabs.Panel>
 
+          {staff.can("reset") ? (
+            <Tabs.Panel id="progress" className="p-5">
+              <ProgressPanel playerId={p.id} />
+            </Tabs.Panel>
+          ) : null}
+
           <Tabs.Panel id="activity" className="p-5">
             {p.audit.length === 0 ? (
               <Empty>No staff actions on this player yet.</Empty>
@@ -690,6 +634,7 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
       {modal === "status" ? <StatusDialog p={p} onClose={() => setModal(null)} /> : null}
       {modal === "mute" ? <MuteDialog p={p} onClose={() => setModal(null)} /> : null}
       {modal === "limits" ? <LimitsDialog p={p} onClose={() => setModal(null)} /> : null}
+      {modal === "reset" ? <ResetDialog playerId={p.id} name={p.name} onClose={() => setModal(null)} /> : null}
     </>
   );
 }

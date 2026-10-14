@@ -1,7 +1,8 @@
 "use client";
 
-import { Avatar as HeroAvatar, Chip, Spinner } from "@heroui/react";
-import { avatarSrc, type Badge } from "@/lib/api";
+import { useState } from "react";
+import { Alert, Avatar as HeroAvatar, Button, Checkbox, Chip, Description, Modal, Spinner, toast } from "@heroui/react";
+import { ApiError, avatarSrc, type Badge, useAdminAction } from "@/lib/api";
 import { initials } from "@/lib/format";
 
 const SIZES = { xs: "size-5 text-[10px]", sm: "size-7 text-[11px]", md: "size-9 text-xs", lg: "size-16 text-lg" } as const;
@@ -102,5 +103,114 @@ export function BarChart({ data, label }: { data: { day: string; value: number }
         ) : null,
       )}
     </svg>
+  );
+}
+
+// ── Action dialogs ───────────────────────────────────
+
+/** Runs one admin call: keeps the error on screen, toasts the success, closes up after. */
+export function useRun(onDone: () => void) {
+  const act = useAdminAction();
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  async function run(path: string, body: unknown, done: string) {
+    setBusy(true);
+    setError(null);
+    try {
+      await act(path, body);
+      toast(done, { variant: "success" });
+      onDone();
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "That didn't work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return { run, error, busy };
+}
+
+/** One shell for every action dialog: heading, body, and the two footer buttons. */
+export function ActionModal({
+  title,
+  onClose,
+  error,
+  children,
+  action,
+  wide,
+}: {
+  title: string;
+  onClose: () => void;
+  error: string | null;
+  children: React.ReactNode;
+  action: React.ReactNode;
+  wide?: boolean;
+}) {
+  return (
+    <Modal.Backdrop isOpen onOpenChange={(open: boolean) => !open && onClose()}>
+      <Modal.Container>
+        <Modal.Dialog className={wide ? "sm:max-w-[620px]" : "sm:max-w-[460px]"}>
+          <Modal.CloseTrigger />
+          <Modal.Header>
+            <Modal.Heading>{title}</Modal.Heading>
+          </Modal.Header>
+          <Modal.Body className="grid gap-4">
+            {children}
+            {error ? (
+              <Alert status="danger">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Alert.Description>{error}</Alert.Description>
+                </Alert.Content>
+              </Alert>
+            ) : null}
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="tertiary" onPress={onClose}>
+              Cancel
+            </Button>
+            {action}
+          </Modal.Footer>
+        </Modal.Dialog>
+      </Modal.Container>
+    </Modal.Backdrop>
+  );
+}
+
+export function Segmented<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: [T, string][]; label: string }) {
+  return (
+    <div role="group" aria-label={label} className="bg-default-100 flex gap-0.5 rounded-lg p-0.5">
+      {options.map(([key, text]) => (
+        <Button key={key} size="sm" className="flex-1" variant={value === key ? "secondary" : "ghost"} aria-pressed={value === key} onPress={() => onChange(key)}>
+          {text}
+        </Button>
+      ))}
+    </div>
+  );
+}
+
+/** A checkbox with its label, and an optional line of explanation underneath. */
+export function Check({
+  isSelected,
+  onChange,
+  label,
+  hint,
+  isDisabled,
+}: {
+  isSelected: boolean;
+  onChange: (v: boolean) => void;
+  label: React.ReactNode;
+  hint?: React.ReactNode;
+  isDisabled?: boolean;
+}) {
+  return (
+    <Checkbox isSelected={isSelected} onChange={onChange} isDisabled={isDisabled}>
+      <Checkbox.Content>
+        <Checkbox.Control>
+          <Checkbox.Indicator />
+        </Checkbox.Control>
+        {label}
+      </Checkbox.Content>
+      {hint ? <Description>{hint}</Description> : null}
+    </Checkbox>
   );
 }

@@ -30,6 +30,7 @@ const GROUPS: [string, string][] = [
   ["shop", "Shop"],
   ["announcement", "Announcements"],
   ["staff", "Staff"],
+  ["progress", "Achievements and counters"],
   ["rounds", "Record retention"],
 ];
 

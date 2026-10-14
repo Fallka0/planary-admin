@@ -79,7 +79,7 @@ export function avatarSrc(path: string | null) {
 // ── Types ────────────────────────────────────────────
 
 export type Role = "owner" | "manager" | "support" | "viewer";
-export type Permission = "view" | "note" | "moderate" | "restrict" | "chips" | "games" | "economy" | "announce" | "audit" | "staff";
+export type Permission = "view" | "note" | "moderate" | "restrict" | "chips" | "games" | "economy" | "announce" | "audit" | "staff" | "reset";
 
 export interface StaffMe {
   id: string;
@@ -150,4 +150,50 @@ export interface RoundDetail extends RoundRow {
     returned: number;
     detail: Record<string, unknown>;
   }[];
+}
+
+// ── Progress: achievements, counters and resets ───────
+
+export interface AchievementRow {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  grade: 1 | 2 | 3 | 4;
+  glyph: string;
+  secret: boolean;
+  progress: { stat: string; target: number } | null;
+  unlockedAt: number | null;
+  /** Cosmetics this one hands out when it unlocks. */
+  rewards: { id: string; name: string; kind: string }[];
+}
+
+export interface StatField {
+  key: string;
+  label: string;
+  hint?: string;
+  min: number;
+  max: number;
+  store: "stats" | "player";
+}
+
+export interface ResetArea {
+  id: string;
+  label: string;
+  detail: string;
+  recommended: boolean;
+}
+
+export interface Progress {
+  achievements: AchievementRow[];
+  stats: {
+    fields: StatField[];
+    values: Record<string, number>;
+    /** Names of counters a game server writes that the panel has no label for yet; their values are in `values`. */
+    extra: string[];
+    computed: { balance: number; friends: number; items: number };
+    /** Counter names that are only ever counted live, and why they can't be set. */
+    refused: Record<string, string>;
+  };
+  reset: { areas: ResetArea[]; starterChips: number; balance: number; confirm: string };
 }

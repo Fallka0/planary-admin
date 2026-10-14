@@ -14,7 +14,7 @@ interface Member extends Badge {
 }
 
 const ROLES: { role: Role; label: string; can: string }[] = [
-  { role: "owner", label: "Owner", can: "Everything, including staff." },
+  { role: "owner", label: "Owner", can: "Everything, including staff, account resets and handing out progress." },
   { role: "manager", label: "Manager", can: "Players, chips, restrictions, games, economy, announcements, audit log." },
   { role: "support", label: "Support", can: "Look up players, notes, mutes and moderation. No chip changes." },
   { role: "viewer", label: "Viewer", can: "Read-only: figures, players and transactions." },
