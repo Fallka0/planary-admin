@@ -21,6 +21,7 @@ interface Entry {
 const GROUPS: [string, string][] = [
   ["all", "Everything"],
   ["chips", "Chips"],
+  ["bank", "Bank"],
   ["account", "Accounts"],
   ["chat", "Mutes"],
   ["limits", "Limits"],

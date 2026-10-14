@@ -8,6 +8,7 @@ import { useTheme } from "next-themes";
 import {
   Coins,
   Gamepad2,
+  Landmark,
   Layers,
   LayoutDashboard,
   LogOut,
@@ -55,6 +56,7 @@ const NAV: { label: string; items: { href: string; label: string; icon: typeof U
   {
     label: "Operate",
     items: [
+      { href: "/bank", label: "Bank", icon: Landmark },
       { href: "/economy", label: "Economy & shop", icon: Coins },
       { href: "/staff", label: "Staff", icon: UserCog },
       { href: "/audit", label: "Audit log", icon: ScrollText, needs: "audit" },
