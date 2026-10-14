@@ -23,7 +23,7 @@ interface Bank {
   period: Flows;
   lifetime: Flows;
   sources: { source: string; chips_in: number; chips_out: number }[];
-  daily: { day: string; net: number; balance: number }[];
+  daily: { day: string; net: number; result: number; balance: number }[];
   moves: { id: number; amount: number; reason: string; staff_name: string; created_at: number }[];
 }
 
@@ -37,7 +37,7 @@ const SOURCE: Record<string, string> = {
 };
 const CHART = {
   balance: { label: "Bank balance", help: "What the bank held at the close of each day." },
-  net: { label: "Daily change", help: "Chips the bank gained or lost each day. Below the line, it paid out more than it took in." },
+  result: { label: "House result", help: "Bets taken minus winnings paid each day. Below the line, the players won. Staff deposits and withdrawals aren't counted." },
 } as const;
 
 function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
@@ -124,6 +124,10 @@ export default function BankPage() {
 
   const c = CHART[chart];
   const p = data.period;
+  const today = data.today.wagered - data.today.paid;
+  const period = p.wagered - p.paid;
+  const lifetime = data.lifetime.wagered - data.lifetime.paid;
+  const moved = data.lifetime.deposits - data.lifetime.withdrawals;
 
   return (
     <>
@@ -160,10 +164,15 @@ export default function BankPage() {
       ) : null}
 
       <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4" aria-label="Key figures">
-        <Kpi label="Bank balance" value={chips(data.balance)} tone={tone(data.balance)} sub="Everything the house holds" />
-        <Kpi label="Today" value={signed(data.today.net)} tone={tone(data.today.net)} sub={`${chips(data.today.wagered)} taken, ${chips(data.today.paid)} paid`} />
-        <Kpi label={`Last ${data.days} days`} value={signed(p.net)} tone={tone(p.net)} sub={`${chips(p.wagered)} taken, ${chips(p.paid)} paid`} />
-        <Kpi label="Since launch" value={signed(data.lifetime.wagered - data.lifetime.paid)} tone={tone(data.lifetime.wagered - data.lifetime.paid)} sub="House result at the tables" />
+        <Kpi
+          label="Bank balance"
+          value={chips(data.balance)}
+          tone={tone(data.balance)}
+          sub={moved ? `Includes ${signed(moved)} moved in by staff` : "Everything the house holds"}
+        />
+        <Kpi label="House result today" value={signed(today)} tone={tone(today)} sub={`${chips(data.today.wagered)} taken, ${chips(data.today.paid)} paid`} />
+        <Kpi label={`House result, ${data.days} days`} value={signed(period)} tone={tone(period)} sub={`${chips(p.wagered)} taken, ${chips(p.paid)} paid`} />
+        <Kpi label="House result since launch" value={signed(lifetime)} tone={tone(lifetime)} sub={`${chips(data.lifetime.wagered)} taken, ${chips(data.lifetime.paid)} paid`} />
       </section>
 
       <Card>
@@ -181,7 +190,7 @@ export default function BankPage() {
               onChange={setChart}
               options={[
                 ["balance", "Balance"],
-                ["net", "Change"],
+                ["result", "Result"],
               ]}
             />
           </div>
