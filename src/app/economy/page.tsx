@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Button, Card, Chip, Description, Input, Label, Skeleton, Switch, Table, TextField, toast } from "@heroui/react";
+import { Button, Card, Chip, Description, Input, Label, Skeleton, Table, TextField, toast } from "@heroui/react";
 import { useStaff } from "@/components/Shell";
 import { ApiError, useAdmin, useAdminAction } from "@/lib/api";
 import { chips } from "@/lib/format";
@@ -16,12 +16,22 @@ interface Item {
   kind: string;
   name: string;
   tier: string;
-  basePrice: number | null;
-  price: number | null;
-  enabled: boolean;
-  reward?: string;
+  reward: string | null;
+  copies: number;
   owners: number;
-  revenue: number;
+  listings: number;
+  lowest: number | null;
+  sales: number;
+  volume: number;
+  fees: number;
+}
+interface CaseRow {
+  id: string;
+  name: string;
+  price: number;
+  items: number;
+  opened: number;
+  chips: number;
 }
 
 const KIND: Record<string, string> = { border: "Border", banner: "Banner", title: "Title", cardback: "Card back", chipset: "Chips" };
@@ -88,16 +98,6 @@ function SettingsCard({ settings, defaults }: { settings: Settings; defaults: Se
 }
 
 function ItemRow({ item }: { item: Item }) {
-  const staff = useStaff();
-  const act = useAdminAction();
-  const [price, setPrice] = useState(item.price?.toString() ?? "");
-  const editable = staff.can("economy") && item.basePrice !== null;
-  const save = (body: unknown, done: string) =>
-    act(`/shop/${item.id}`, body).then(
-      () => toast(done, { variant: "success" }),
-      (e) => toast(e instanceof ApiError ? e.message : "That didn't work.", { variant: "danger" }),
-    );
-
   return (
     <Table.Row>
       <Table.Cell>
@@ -105,85 +105,100 @@ function ItemRow({ item }: { item: Item }) {
         <div className="text-default-500 flex items-center gap-1.5 text-xs">
           {KIND[item.kind]}
           <Chip color={TIER_COLOR[item.tier] ?? "default"}>{item.tier}</Chip>
-          {item.reward ? "achievement reward" : null}
+          {item.reward ? "achievement reward, not tradeable" : null}
         </div>
       </Table.Cell>
-      <Table.Cell>
-        {item.basePrice === null ? (
-          <span className="text-default-500">Not for sale</span>
-        ) : editable ? (
-          <Input
-            aria-label={`Price of ${item.name}`}
-            className="num w-28"
-            inputMode="numeric"
-            value={price}
-            onChange={(e) => setPrice(e.target.value.replace(/\D/g, ""))}
-            onBlur={() => {
-              const next = Number(price);
-              if (next && next !== item.price) void save({ price: next === item.basePrice ? null : next }, "Price saved");
-            }}
-          />
-        ) : (
-          <span className="num">{chips(item.price)}</span>
-        )}
-        {item.basePrice !== null && item.price !== item.basePrice ? <div className="text-default-500 text-xs">list {chips(item.basePrice)}</div> : null}
+      <Table.Cell className="num">
+        {chips(item.copies)}
+        {item.copies !== item.owners ? <div className="text-default-500 text-xs">{chips(item.owners)} players</div> : null}
       </Table.Cell>
-      <Table.Cell className="num">{chips(item.owners)}</Table.Cell>
-      <Table.Cell className="num">{chips(item.revenue)}</Table.Cell>
-      <Table.Cell>
-        {item.basePrice === null ? null : staff.can("economy") ? (
-          <Switch isSelected={item.enabled} onChange={(on: boolean) => void save({ enabled: on }, on ? "Back in the shop" : "Hidden from the shop")}>
-            <Switch.Content>
-              <Switch.Control>
-                <Switch.Thumb />
-              </Switch.Control>
-              {item.enabled ? "On sale" : "Hidden"}
-            </Switch.Content>
-          </Switch>
+      <Table.Cell className="num">
+        {item.listings ? (
+          <>
+            {chips(item.listings)}
+            <div className="text-default-500 text-xs">from {chips(item.lowest)}</div>
+          </>
         ) : (
-          <span className="text-default-500">{item.enabled ? "On sale" : "Hidden"}</span>
+          <span className="text-default-500">—</span>
         )}
       </Table.Cell>
+      <Table.Cell className="num">{item.sales ? chips(item.sales) : <span className="text-default-500">—</span>}</Table.Cell>
+      <Table.Cell className="num">{item.volume ? chips(item.volume) : <span className="text-default-500">—</span>}</Table.Cell>
     </Table.Row>
   );
 }
 
 export default function EconomyPage() {
-  const { data } = useAdmin<{ settings: Settings; defaults: Settings; items: Item[] }>("/economy");
+  const { data } = useAdmin<{ settings: Settings; defaults: Settings; fee: number; cases: CaseRow[]; items: Item[] }>("/economy");
   if (!data) return <Skeleton className="h-96 rounded-xl" />;
-  const revenue = data.items.reduce((s, i) => s + i.revenue, 0);
+  const opened = data.cases.reduce((s, c) => s + c.chips, 0);
+  const fees = data.items.reduce((s, i) => s + i.fees, 0);
+  const volume = data.items.reduce((s, i) => s + i.volume, 0);
 
   return (
     <>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Economy &amp; shop</h1>
-        <p className="text-default-500">How many free chips come in, and what the shop takes back out.</p>
+        <h1 className="text-2xl font-bold tracking-tight">Economy &amp; market</h1>
+        <p className="text-default-500">How many free chips come in, and what cases and the market take back out.</p>
       </header>
 
       <SettingsCard key={JSON.stringify(data.settings)} settings={data.settings} defaults={data.defaults} />
 
       <Card>
         <Card.Header>
-          <Card.Title>Shop items</Card.Title>
+          <Card.Title>Cases</Card.Title>
+          <Card.Description>{chips(opened)} chips spent on cases so far, all paid into the bank.</Card.Description>
+        </Card.Header>
+        <Card.Content className="px-0">
+          <Table>
+            <Table.ScrollContainer>
+              <Table.Content aria-label="Cases">
+                <Table.Header>
+                  <Table.Column isRowHeader>Case</Table.Column>
+                  <Table.Column>Price</Table.Column>
+                  <Table.Column>Items</Table.Column>
+                  <Table.Column>Opened</Table.Column>
+                  <Table.Column>Chips taken</Table.Column>
+                </Table.Header>
+                <Table.Body>
+                  {data.cases.map((c) => (
+                    <Table.Row key={c.id}>
+                      <Table.Cell className="font-medium">{c.name}</Table.Cell>
+                      <Table.Cell className="num">{chips(c.price)}</Table.Cell>
+                      <Table.Cell className="num">{c.items}</Table.Cell>
+                      <Table.Cell className="num">{chips(c.opened)}</Table.Cell>
+                      <Table.Cell className="num">{chips(c.chips)}</Table.Cell>
+                    </Table.Row>
+                  ))}
+                </Table.Body>
+              </Table.Content>
+            </Table.ScrollContainer>
+          </Table>
+        </Card.Content>
+      </Card>
+
+      <Card>
+        <Card.Header>
+          <Card.Title>Items on the market</Card.Title>
           <Card.Description>
-            {chips(revenue)} chips spent in the shop so far. Hidden items stay with players who already own them, and price changes never touch past
-            purchases.
+            {chips(volume)} chips have changed hands between players. The house keeps {Math.round(data.fee * 100)}% of each sale: {chips(fees)} so far,
+            paid into the bank.
           </Card.Description>
         </Card.Header>
         <Card.Content className="px-0">
           <Table>
             <Table.ScrollContainer>
-              <Table.Content aria-label="Shop items" className="min-w-[720px]">
+              <Table.Content aria-label="Items" className="min-w-[720px]">
                 <Table.Header>
                   <Table.Column isRowHeader>Item</Table.Column>
-                  <Table.Column>Price</Table.Column>
-                  <Table.Column>Owners</Table.Column>
-                  <Table.Column>Chips earned</Table.Column>
-                  <Table.Column>Availability</Table.Column>
+                  <Table.Column>Copies</Table.Column>
+                  <Table.Column>For sale</Table.Column>
+                  <Table.Column>Sales</Table.Column>
+                  <Table.Column>Volume</Table.Column>
                 </Table.Header>
                 <Table.Body>
                   {data.items.map((item) => (
-                    <ItemRow key={`${item.id}:${item.price}:${item.enabled}`} item={item} />
+                    <ItemRow key={item.id} item={item} />
                   ))}
                 </Table.Body>
               </Table.Content>

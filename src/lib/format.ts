@@ -51,4 +51,8 @@ export const KIND_LABEL: Record<string, string> = {
   transfer_out: "Transfer out",
   shop: "Shop",
   adjustment: "Adjustment",
+  achievement: "Achievement",
+  case: "Case",
+  market_buy: "Market purchase",
+  market_sale: "Market sale",
 };

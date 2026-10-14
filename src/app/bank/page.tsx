@@ -11,6 +11,8 @@ interface Flows {
   wagered: number;
   paid: number;
   shop: number;
+  cases: number;
+  market: number;
   deposits: number;
   withdrawals: number;
   net: number;
@@ -31,7 +33,9 @@ const SOURCE: Record<string, string> = {
   blackjack: "Blackjack",
   roulette: "Roulette",
   slots: "Slots",
-  shop: "Shop",
+  cases: "Cases",
+  market: "Market fees",
+  shop: "Shop (before the market)",
   staff: "Staff moves",
   unknown: "Unlabelled game",
 };
@@ -135,7 +139,7 @@ export default function BankPage() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight">Bank</h1>
           <p className="text-default-500">
-            The house&apos;s account. Bets at the house games and shop spend go in, winnings come out. Poker pots pass between players and never touch it.
+            The house&apos;s account. Bets at the house games, cases and the market fee go in, winnings come out. Poker pots pass between players and never touch it.
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
@@ -238,7 +242,7 @@ export default function BankPage() {
           </Card.Content>
           <Card.Footer>
             <p className="text-default-500 text-xs">
-              For a game, in is bets taken and out is winnings paid. Shop spend only comes in; staff moves are deposits in and withdrawals out.
+              For a game, in is bets taken and out is winnings paid. Cases and the market fee only come in; staff moves are deposits in and withdrawals out.
             </p>
           </Card.Footer>
         </Card>

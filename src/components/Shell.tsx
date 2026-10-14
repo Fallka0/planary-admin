@@ -57,7 +57,7 @@ const NAV: { label: string; items: { href: string; label: string; icon: typeof U
     label: "Operate",
     items: [
       { href: "/bank", label: "Bank", icon: Landmark },
-      { href: "/economy", label: "Economy & shop", icon: Coins },
+      { href: "/economy", label: "Economy & market", icon: Coins },
       { href: "/staff", label: "Staff", icon: UserCog },
       { href: "/audit", label: "Audit log", icon: ScrollText, needs: "audit" },
     ],
