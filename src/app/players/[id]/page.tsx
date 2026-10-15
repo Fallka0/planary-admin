@@ -7,10 +7,12 @@ import { ArrowLeft, Copy } from "lucide-react";
 import { useStaff } from "@/components/Shell";
 import { ActionModal, Avatar, Empty, Loading, Segmented, StatusChip, useRun } from "@/components/ui";
 import { ProgressPanel, ResetDialog } from "./progress";
-import { type Badge, type LedgerRow, useAdmin, useAdminAction } from "@/lib/api";
+import { ApiError, type Badge, type LedgerRow, useAdmin, useAdminAction } from "@/lib/api";
 import { chips, dateTime, KIND_LABEL, signed } from "@/lib/format";
 
 interface Detail extends Badge {
+  /** Whether the casino name is their own (or staff's) pick, how often they picked one, and what the next costs them. */
+  naming: { custom: boolean; changes: number; nextPrice: number };
   balance: number;
   bio: string | null;
   joinedAt: number;
@@ -31,7 +33,7 @@ interface Detail extends Badge {
   audit: { id: number; staff_name: string; action: string; details: string; created_at: number }[];
 }
 
-type Sheet = "adjust" | "status" | "mute" | "limits" | "reset" | null;
+type Sheet = "adjust" | "status" | "mute" | "limits" | "reset" | "name" | "password" | null;
 
 const DAY = 86_400_000;
 
@@ -232,6 +234,102 @@ function LimitsDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
   );
 }
 
+function NameDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
+  const [name, setName] = useState(p.name);
+  const [reason, setReason] = useState("");
+  const { run, error, busy } = useRun(onClose);
+  const clean = name.trim();
+
+  return (
+    <ActionModal
+      title="Casino name"
+      onClose={onClose}
+      error={error}
+      action={
+        <>
+          {p.naming.custom ? (
+            <Button variant="secondary" isPending={busy} onPress={() => void run(`/players/${p.id}/name/reset`, {}, "Name handed back to the account")}>
+              Use account name
+            </Button>
+          ) : null}
+          <Button isPending={busy} isDisabled={clean.length < 2 || clean === p.name} onPress={() => void run(`/players/${p.id}/name`, { name: clean, reason }, "Player renamed")}>
+            Rename
+          </Button>
+        </>
+      }
+    >
+      <p className="text-default-500 text-sm">
+        {p.naming.custom ? "This name was picked in the casino." : "This is their Planary account name."} They&apos;ve changed it themselves{" "}
+        {p.naming.changes} {p.naming.changes === 1 ? "time" : "times"}; their next change costs{" "}
+        {p.naming.nextPrice ? `${chips(p.naming.nextPrice)} chips` : "nothing"}. A rename here is free and doesn&apos;t count toward that.
+      </p>
+      <TextField value={name} onChange={(v) => setName(v.slice(0, 24))} maxLength={24}>
+        <Label>New name</Label>
+        <Input />
+        <Description>2–24 characters, and no other player may have it.</Description>
+      </TextField>
+      <TextField value={reason} onChange={setReason} maxLength={200}>
+        <Label>Reason</Label>
+        <Input placeholder="e.g. The old name broke the house rules" />
+        <Description>The player sees this.</Description>
+      </TextField>
+    </ActionModal>
+  );
+}
+
+function PasswordDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
+  const act = useAdminAction();
+  const [result, setResult] = useState<{ link: string; expiresAt: number; mailed: boolean } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  async function make() {
+    setBusy(true);
+    setError(null);
+    try {
+      setResult(await act<{ link: string; expiresAt: number; mailed: boolean }>(`/players/${p.id}/password-reset`));
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "That didn't work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ActionModal
+      title="Reset password"
+      onClose={onClose}
+      error={error}
+      action={
+        result ? (
+          <Button onPress={() => void navigator.clipboard.writeText(result.link).then(() => toast("Link copied"))}>
+            <Copy className="size-4" /> Copy link
+          </Button>
+        ) : (
+          <Button isPending={busy} onPress={() => void make()}>
+            Make reset link
+          </Button>
+        )
+      }
+    >
+      {result ? (
+        <>
+          <p className="text-default-500 text-sm">
+            {result.mailed ? "It was also mailed to the player. " : ""}Give this link to {p.name} only. It works once, until {dateTime(result.expiresAt)}, and
+            lets them choose a new password. Any older reset link stops working.
+          </p>
+          <code className="bg-default-100 rounded-lg p-3 text-xs break-all select-all">{result.link}</code>
+        </>
+      ) : (
+        <p className="text-default-500 text-sm">
+          Makes a one-time link for {p.name}&apos;s Planary account, valid for 24 hours, where they choose a new password themselves. Nobody on staff sees or
+          sets the password. Their current password keeps working until they use the link; then every device is signed out.
+        </p>
+      )}
+    </ActionModal>
+  );
+}
+
 function Stat({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
     <dl className="divide-default-200 divide-y">
@@ -379,6 +477,9 @@ const ACTION_LABEL: Record<string, string> = {
   "limits.set": "set limits",
   "avatar.remove": "removed the picture",
   "bio.remove": "removed the bio",
+  "name.set": "renamed the player",
+  "name.reset": "handed the name back to the account",
+  "password.reset_link": "made a password reset link",
   "note.add": "added a note",
   "progress.achievements": "changed achievements",
   "progress.stats": "set counters",
@@ -475,12 +576,18 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
             <Button variant="secondary" onPress={() => setModal("limits")}>
               Responsible play
             </Button>
+            <Button variant="secondary" onPress={() => setModal("password")}>
+              Reset password
+            </Button>
           </>
         ) : null}
         {staff.can("moderate") ? (
           <>
             <Button variant="secondary" onPress={() => setModal("mute")}>
               {p.mutedUntil ? "Chat mute" : "Mute chat"}
+            </Button>
+            <Button variant="secondary" onPress={() => setModal("name")}>
+              Change name
             </Button>
             {p.avatar ? (
               <Button variant="danger-soft" onPress={() => remove("avatar")}>
@@ -635,6 +742,8 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
       {modal === "mute" ? <MuteDialog p={p} onClose={() => setModal(null)} /> : null}
       {modal === "limits" ? <LimitsDialog p={p} onClose={() => setModal(null)} /> : null}
       {modal === "reset" ? <ResetDialog playerId={p.id} name={p.name} onClose={() => setModal(null)} /> : null}
+      {modal === "name" ? <NameDialog p={p} onClose={() => setModal(null)} /> : null}
+      {modal === "password" ? <PasswordDialog p={p} onClose={() => setModal(null)} /> : null}
     </>
   );
 }
