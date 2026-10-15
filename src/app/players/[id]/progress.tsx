@@ -53,7 +53,12 @@ function AchievementRowView({ a, pending, onToggle }: { a: AchievementRow; pendi
           ))}
         </span>
         <span className="text-default-500 block text-xs">{a.description}</span>
-        {held ? <span className="text-default-400 block text-xs">Unlocked {dateTime(a.unlockedAt)}</span> : null}
+        {held ? (
+          <span className="text-default-400 block text-xs">
+            Unlocked {dateTime(a.unlockedAt)}
+            {a.unclaimed ? " · rewards not claimed yet" : ""}
+          </span>
+        ) : null}
       </span>
       <span className="shrink-0 text-xs font-medium">
         {granting ? <span className="text-success">Granting</span> : taking ? <span className="text-danger">Taking back</span> : held ? "Held" : "—"}
@@ -124,10 +129,11 @@ function Achievements({ playerId, list, reload }: { playerId: string; list: Achi
             <Switch.Control>
               <Switch.Thumb />
             </Switch.Control>
-            Move the cosmetics with the badge
+            Rewards go with the badge
           </Switch.Content>
           <Description>
-            A granted achievement hands out the cosmetic it unlocks; one taken back removes it again, unless the player also bought it in the shop.
+            On: a granted achievement waits in the player&apos;s Achievements tab with its chips and cosmetic to claim, and one taken back removes its
+            cosmetic again. Off: it arrives already claimed, and nothing is paid or taken back.
           </Description>
         </Switch>
         <Switch isSelected={silent} onChange={setSilent}>

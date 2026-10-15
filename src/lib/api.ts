@@ -164,6 +164,8 @@ export interface AchievementRow {
   secret: boolean;
   progress: { stat: string; target: number } | null;
   unlockedAt: number | null;
+  /** Unlocked, with its chips and cosmetic still waiting for the player to claim. */
+  unclaimed: boolean;
   /** Cosmetics this one hands out when it unlocks. */
   rewards: { id: string; name: string; kind: string }[];
 }
