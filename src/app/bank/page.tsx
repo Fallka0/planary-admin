@@ -35,7 +35,7 @@ const SOURCE: Record<string, string> = {
   slots: "Slots",
   cases: "Cases",
   market: "Market fees",
-  shop: "Shop (before the market)",
+  shop: "Name changes & old shop",
   staff: "Staff moves",
   unknown: "Unlabelled game",
 };
