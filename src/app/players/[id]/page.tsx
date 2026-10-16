@@ -12,7 +12,8 @@ import { chips, dateTime, KIND_LABEL, signed } from "@/lib/format";
 
 interface Detail extends Badge {
   /** Whether the casino name is their own (or staff's) pick, how often they picked one, and what the next costs them. */
-  naming: { custom: boolean; changes: number; nextPrice: number };
+  /** Missing while the casino API runs an older version; the name dialog then says less. */
+  naming?: { custom: boolean; changes: number; nextPrice: number };
   balance: number;
   bio: string | null;
   joinedAt: number;
@@ -239,6 +240,7 @@ function NameDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
   const [reason, setReason] = useState("");
   const { run, error, busy } = useRun(onClose);
   const clean = name.trim();
+  const naming = p.naming;
 
   return (
     <ActionModal
@@ -247,7 +249,7 @@ function NameDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
       error={error}
       action={
         <>
-          {p.naming.custom ? (
+          {naming?.custom !== false ? (
             <Button variant="secondary" isPending={busy} onPress={() => void run(`/players/${p.id}/name/reset`, {}, "Name handed back to the account")}>
               Use account name
             </Button>
@@ -259,9 +261,14 @@ function NameDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
       }
     >
       <p className="text-default-500 text-sm">
-        {p.naming.custom ? "This name was picked in the casino." : "This is their Planary account name."} They&apos;ve changed it themselves{" "}
-        {p.naming.changes} {p.naming.changes === 1 ? "time" : "times"}; their next change costs{" "}
-        {p.naming.nextPrice ? `${chips(p.naming.nextPrice)} chips` : "nothing"}. A rename here is free and doesn&apos;t count toward that.
+        {naming ? (
+          <>
+            {naming.custom ? "This name was picked in the casino." : "This is their Planary account name."} They&apos;ve changed it themselves{" "}
+            {naming.changes} {naming.changes === 1 ? "time" : "times"}; their next change costs{" "}
+            {naming.nextPrice ? `${chips(naming.nextPrice)} chips` : "nothing"}.{" "}
+          </>
+        ) : null}
+        A rename here is free and doesn&apos;t use up the player&apos;s own free change.
       </p>
       <TextField value={name} onChange={(v) => setName(v.slice(0, 24))} maxLength={24}>
         <Label>New name</Label>
