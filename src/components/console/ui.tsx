@@ -278,7 +278,7 @@ export function Toast({ text, tone, onDone }: { text: string; tone?: "err"; onDo
     return () => window.clearTimeout(t);
   }, [onDone, tone, text]);
   return (
-    <div className={`toast${tone ? ` ${tone}` : ""}`} role={tone ? "alert" : "status"}>
+    <div className={`ctoast${tone ? ` ${tone}` : ""}`} role={tone ? "alert" : "status"}>
       {text}
     </div>
   );
