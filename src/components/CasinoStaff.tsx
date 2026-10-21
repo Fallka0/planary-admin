@@ -16,3 +16,6 @@ export function useStaff() {
   if (!staff) throw new Error("useStaff outside the Casino section");
   return { ...staff, can: (p: Permission) => staff.permissions.includes(p) };
 }
+
+/** The Casino heading's right-hand slot (the overview puts its period toggle there). */
+export const CasinoHeadSlot = createContext<HTMLElement | null>(null);

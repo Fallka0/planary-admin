@@ -6,7 +6,7 @@ import { Gate, useBusy, useConsole } from "@/components/console/Shell";
 import { ErrorCard, Ic, PageHead, Sk, Table, Td } from "@/components/console/ui";
 import { CONSOLE } from "@/design/console-copy";
 import { adminCall } from "@/lib/api";
-import { dayTime, num, shortName } from "@/lib/fmt";
+import { dayTime, num } from "@/lib/fmt";
 import { FIXTURES, OrgError, orgCall } from "@/lib/org";
 import type { AuditEntry } from "@/lib/org-contract";
 
@@ -107,10 +107,14 @@ function AuditPageInner() {
   const { can } = useConsole();
   const [area, setArea] = useState("");
   const [who, setWho] = useState("");
-  const [data, setData] = useState<Page | null>(null);
-  const [error, setError] = useState<OrgError | null>(null);
-  const [loading, setLoading] = useState(true);
   const [attempt, setAttempt] = useState(0);
+  // Results are tagged with the filter they were loaded for; a new filter shows loading until its own arrive.
+  const [res, setRes] = useState<{ key: string; data: Page | null; error: OrgError | null; busy: boolean }>({ key: "", data: null, error: null, busy: false });
+  const key = `${area}|${attempt}`;
+  const current = res.key === key;
+  const data = current ? res.data : null;
+  const error = current ? res.error : null;
+  const loading = !current || res.busy;
   useBusy(loading);
 
   // Casino rows come from the casino API's own log (Owners and Managers can read it there).
@@ -141,28 +145,25 @@ function AuditPageInner() {
   // A new filter starts from the newest entries.
   useEffect(() => {
     let alive = true;
-    setLoading(true);
-    setError(null);
-    setData(null);
     fetchPage({ org: "", casino: Number.MAX_SAFE_INTEGER }).then(
-      (p) => alive && (setData({ ...p, entries: p.entries.sort((a, b) => b.at - a.at) }), setLoading(false)),
-      (e: OrgError) => alive && (setError(e), setLoading(false)),
+      (p) => alive && setRes({ key, data: { ...p, entries: p.entries.sort((a, b) => b.at - a.at) }, error: null, busy: false }),
+      (e: OrgError) => alive && setRes({ key, data: null, error: e, busy: false }),
     );
     return () => {
       alive = false;
     };
-  }, [fetchPage, attempt]);
+  }, [fetchPage, key]);
 
   function older() {
     if (!data) return;
-    setLoading(true);
+    setRes((r) => ({ ...r, busy: true }));
     fetchPage({ org: data.org, casino: data.casino }).then(
-      (p) => (setData({ ...p, entries: [...data.entries, ...p.entries].sort((a, b) => b.at - a.at) }), setLoading(false)),
-      (e: OrgError) => (setError(e), setLoading(false)),
+      (p) => setRes({ key, data: { ...p, entries: [...data.entries, ...p.entries].sort((a, b) => b.at - a.at) }, error: null, busy: false }),
+      (e: OrgError) => setRes({ key, data, error: e, busy: false }),
     );
   }
 
-  const rows = data?.entries ?? [];
+  const rows = useMemo(() => data?.entries ?? [], [data]);
   const people = useMemo(() => [...new Set(rows.map((r) => r.actor?.name).filter(Boolean) as string[])].sort(), [rows]);
   const shown = rows.filter((r) => !who || r.actor?.name === who);
   const hasMore = !!data && (data.org !== null || data.casino !== null);
@@ -228,7 +229,7 @@ function AuditPageInner() {
             {shown.map((a) => (
               <tr className="dt-r" key={a.id}>
                 <Td style={{ whiteSpace: "nowrap" }}>{dayTime(a.at)}</Td>
-                <Td style={{ whiteSpace: "nowrap" }}>{a.actor ? shortName(a.actor.name) : "System"}</Td>
+                <Td style={{ whiteSpace: "nowrap" }}>{a.actor ? a.actor.name : "System"}</Td>
                 <Td>
                   <b>{a.sentence}</b>
                 </Td>

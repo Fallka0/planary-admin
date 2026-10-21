@@ -215,7 +215,7 @@ function StaffPageInner() {
                   </Td>
                   <Td hide>{s.email}</Td>
                   <Td>
-                    <span className="chip">{ROLE_NAME[s.role]}</span>
+                    <span className="cx">{ROLE_NAME[s.role]}</span>
                   </Td>
                   <Td hide>{s.lastActive ? ago(s.lastActive, t) : "invited"}</Td>
                   <Td r>

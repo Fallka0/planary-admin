@@ -100,7 +100,7 @@ function requests(): RequestSummary[] {
     urgent: "urgent" in r ? !!r.urgent : false,
     organisation: { id: F.customers.find((c) => c.n === r.org)?.id ?? r.org, name: r.org },
     from: { id: `u_${r.who.split(" ")[0].toLowerCase()}`, name: r.who, email: `${r.who.split(" ")[0].toLowerCase()}@example.ch` },
-    tournament: r.id === "REQ-1184" ? { id: "t_gurten", name: "Gurten LAN" } : null,
+    tournament: r.id === "REQ-1184" ? { id: "t_0", name: "Gurten LAN" } : null,
     assignee: r.as ? STAFF_IDS[r.as] : null,
     createdAt: when(r.t),
     updatedAt: when(r.t),
@@ -386,11 +386,12 @@ function detail(id: string): RequestDetail {
 
 const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-export async function fixtureCall<T>(method: "GET" | "POST", path: string, _body?: unknown): Promise<T> {
+export async function fixtureCall<T>(method: "GET" | "POST", path: string): Promise<T> {
   const state = fixtureState();
-  if (state === "loading") await new Promise(() => {}); // stays loading
   await wait(30);
   const url = new URL(path, "https://org.fixtures");
+  // The loading state: the shell is there, the page's own data never arrives.
+  if (state === "loading" && !/^\/console\/(me|status|support)$/.test(url.pathname)) await new Promise(() => {});
   const p = url.pathname;
   const q = url.searchParams;
   if (method === "POST") return { ok: true, id: "inc_0043", organisations: 3 } as T;
@@ -420,6 +421,7 @@ export async function fixtureCall<T>(method: "GET" | "POST", path: string, _body
         return {
           requests: all.filter((r) => r.status === st && (who === "all" || (who === "mine" ? r.assignee?.id === me().id : !r.assignee))),
           counts: { open: all.filter((r) => r.status === "open").length, waiting: all.filter((r) => r.status === "waiting").length, done: 0 },
+          assignable: Object.values(STAFF_IDS).filter((x) => x.id !== "u_tim"),
         };
       },
     ],

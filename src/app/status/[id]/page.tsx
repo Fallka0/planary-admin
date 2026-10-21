@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { use, useEffect, useState } from "react";
+import { use, useState } from "react";
 import { useBusy, useConsole } from "@/components/console/Shell";
 import { useAct } from "@/components/console/useAct";
 import { Bars, Dialog, ErrorCard, Ic, Sk } from "@/components/console/ui";
@@ -35,7 +35,6 @@ function UpdateForm({ incident }: { incident: IncidentDetail }) {
   const [status, setStatus] = useState<IncidentStatus>(incident.status);
   const [message, setMessage] = useState("");
   const [show, setShow] = useState(incident.showToOrganisers);
-  useEffect(() => setStatus(incident.status), [incident.status]);
 
   return (
     <section className="box" aria-labelledby="up-h">
@@ -143,11 +142,11 @@ export default function IncidentPage({ params }: PageProps<"/status/[id]">) {
       <div className="ph">
         <div>
           <div className="steps-s">
-            <span className={`chip ${SEVERITY[inc.severity].tone}`}>
+            <span className={`cx ${SEVERITY[inc.severity].tone}`}>
               <Ic name="alert" />
               {SEVERITY[inc.severity].name}
             </span>
-            <span className={`chip ${STATUS_TONE[inc.status]}`}>{STATUS_NAME[inc.status]}</span>
+            <span className={`cx ${STATUS_TONE[inc.status]}`}>{STATUS_NAME[inc.status]}</span>
           </div>
           <h1 style={{ marginTop: 12 }}>{inc.title}</h1>
           <p>
@@ -171,7 +170,7 @@ export default function IncidentPage({ params }: PageProps<"/status/[id]">) {
 
       <div className="cols">
         <div className="stack">
-          {edit && open ? <UpdateForm incident={inc} /> : null}
+          {edit && open ? <UpdateForm key={inc.status} incident={inc} /> : null}
           <section className="box" aria-labelledby="tl-h">
             <h2 id="tl-h" className="box-t" style={{ marginBottom: 18 }}>
               Timeline

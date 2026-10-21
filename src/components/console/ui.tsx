@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useRef } from "react";
 import type { ReactNode } from "react";
 import { ICONS, type IconName } from "@/design/icons";
@@ -46,11 +47,12 @@ export function MarkSprite() {
 
 /** Bars: one series, 4 px rounded tops, 2 px gaps, a sentence for screen readers, a title per bar. */
 export function Bars({ values, label, titles, tone, height }: { values: number[]; label: string; titles?: string[]; tone?: "err"; height?: number }) {
-  const max = Math.max(1, ...values);
+  // Negative days (players came out ahead) draw in the lighter bar colour, sized by their amount.
+  const max = Math.max(1, ...values.map(Math.abs));
   return (
     <div className="bars" style={height ? { height } : undefined} role="img" aria-label={label}>
       {values.map((v, i) => (
-        <i key={i} className={tone} style={{ height: `${Math.max(3, Math.round((v / max) * 100))}%` }} title={titles?.[i] ?? String(v)} />
+        <i key={i} className={v < 0 ? "dim" : tone} style={{ height: `${Math.max(3, Math.round((Math.abs(v) / max) * 100))}%` }} title={titles?.[i] ?? String(v)} />
       ))}
     </div>
   );
@@ -94,7 +96,7 @@ const STATE: Record<ServiceState, { cls: string; label: string }> = {
 export function StateChip({ state }: { state: ServiceState }) {
   const s = STATE[state];
   return (
-    <span className={`chip ${s.cls}`}>
+    <span className={`cx ${s.cls}`}>
       <span className={`dot ${s.cls}`} />
       {s.label}
     </span>
@@ -102,7 +104,7 @@ export function StateChip({ state }: { state: ServiceState }) {
 }
 
 export function Chip({ tone = "", dot = false, icon, children }: { tone?: "" | "ok" | "warn" | "err" | "info" | "line"; dot?: boolean; icon?: IconName; children: ReactNode }) {
-  const cls = tone === "line" ? "chip chip-line" : `chip ${tone}`;
+  const cls = tone === "line" ? "cx cx-line" : `cx ${tone}`;
   return (
     <span className={cls.trim()}>
       {dot ? <span className={`dot ${tone}`} /> : null}
@@ -140,7 +142,7 @@ export function Table({ cols, colsS, head, children, className = "", style }: { 
         <tr className="dt-r dt-h">
           {head.map((c, i) => (
             <th key={i} scope="col" className={`dt-c${c.r ? " r" : ""}${c.hide ? " hide-s" : ""}`}>
-              {c.h}
+              {c.h || <span className="sr">Actions</span>}
             </th>
           ))}
         </tr>
@@ -205,9 +207,9 @@ export function ErrorCard({ title, error, onRetry }: { title: string; error: Org
           <Ic name="refresh" small />
           {s.errorRetry}
         </button>
-        <a className="btn btn-line btn-s" href="/status">
+        <Link className="btn btn-line btn-s" href="/status">
           {s.errorStatus}
-        </a>
+        </Link>
       </div>
     </div>
   );
@@ -245,8 +247,11 @@ export function Dialog({ title, onClose, children, actions }: { title: string; o
       const items = [...box.current.querySelectorAll<HTMLElement>("input, select, textarea, button, a[href]")].filter((el) => !el.hasAttribute("disabled"));
       if (!items.length) return;
       const [a, z] = [items[0], items[items.length - 1]];
-      if (e.shiftKey && document.activeElement === a) (e.preventDefault(), z.focus());
-      else if (!e.shiftKey && document.activeElement === z) (e.preventDefault(), a.focus());
+      const to = e.shiftKey && document.activeElement === a ? z : !e.shiftKey && document.activeElement === z ? a : null;
+      if (to) {
+        e.preventDefault();
+        to.focus();
+      }
     };
     window.addEventListener("keydown", onKey);
     return () => {

@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import type { ReactNode } from "react";
-import { CasinoStaffProvider } from "@/components/CasinoStaff";
+import { CasinoHeadSlot, CasinoStaffProvider } from "@/components/CasinoStaff";
 import { useBusy } from "@/components/console/Shell";
 import { ErrorCard, PageHead, Sk } from "@/components/console/ui";
 import { type Permission, type StaffMe, useAdmin } from "@/lib/api";
@@ -32,14 +33,15 @@ function on(pathname: string, href: string) {
 export default function CasinoLayout({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const { data: me, error, reload } = useAdmin<StaffMe>("/me");
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
   useBusy(!me && !error);
 
   return (
     <>
       <PageHead title="Casino">
-        <div id="casino-ph-a" style={{ display: "contents" }} />
+        <div ref={setSlot} style={{ display: "contents" }} />
       </PageHead>
-      <nav className="tabs subnav" aria-label="Casino">
+      <nav className="tabbar subnav" aria-label="Casino">
         {TABS.filter((t) => !t.needs || me?.permissions.includes(t.needs)).map((t) => {
           const cur = on(pathname, t.href);
           return (
@@ -56,11 +58,13 @@ export default function CasinoLayout({ children }: { children: ReactNode }) {
             <p>The Casino keeps its own staff list, and this account isn’t on it. An Owner can add it under Staff and roles.</p>
           </div>
         ) : (
-          <ErrorCard title="The Casino didn’t load" error={new OrgError(error.message, error.status, error.code, undefined, Date.now())} onRetry={reload} />
+          <ErrorCard title="The Casino didn’t load" error={new OrgError(error.message, error.status, error.code, undefined, 0)} onRetry={reload} />
         )
       ) : me ? (
         <CasinoStaffProvider me={me}>
-          <div className="casino-pg">{children}</div>
+          <CasinoHeadSlot.Provider value={slot}>
+            <div className="casino-pg">{children}</div>
+          </CasinoHeadSlot.Provider>
         </CasinoStaffProvider>
       ) : (
         <div className="kpis" aria-hidden="true">

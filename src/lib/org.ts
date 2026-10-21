@@ -34,7 +34,7 @@ export class OrgError extends Error {
 }
 
 export async function orgCall<T>(token: string, method: "GET" | "POST", path: string, body?: unknown): Promise<T> {
-  if (FIXTURES) return fixtureCall<T>(method, path, body);
+  if (FIXTURES) return fixtureCall<T>(method, path);
   let res: Response;
   try {
     res = await fetch(`${ORG_API}${path}`, {

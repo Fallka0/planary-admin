@@ -255,7 +255,7 @@ export default function StatusPage() {
                 <ul>
                   {data.open.map((i) => (
                     <li className="inc" key={i.id}>
-                      <span className="chip err">
+                      <span className="cx err">
                         <Ic name="alert" />
                         Open
                       </span>
@@ -271,7 +271,7 @@ export default function StatusPage() {
                   ))}
                   {data.recent.map((i) => (
                     <li className="inc" key={i.id}>
-                      <span className="chip ok">
+                      <span className="cx ok">
                         <Ic name="check" />
                         Resolved
                       </span>

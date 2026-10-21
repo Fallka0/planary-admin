@@ -1,11 +1,12 @@
 "use client";
 
-import { useRouter } from "next/navigation";
-import { useState } from "react";
-import { Button, Card, Skeleton, Table } from "@heroui/react";
-import { BarChart } from "@/components/ui";
+import { useContext, useState } from "react";
+import { createPortal } from "react-dom";
+import { CasinoHeadSlot } from "@/components/CasinoStaff";
+import { useBusy } from "@/components/console/Shell";
+import { Bars, Seg, Sk, Table, Td } from "@/components/console/ui";
 import { type Figures, useAdmin } from "@/lib/api";
-import { chips, pct, signed } from "@/lib/format";
+import { dayMonth, num, signedNum } from "@/lib/fmt";
 
 interface Overview {
   days: number;
@@ -18,179 +19,177 @@ interface Overview {
   daily: { day: string; handle: number; ggr: number; players: number; signups: number }[];
 }
 
-const GAME_NAME: Record<string, string> = { blackjack: "Blackjack", roulette: "Roulette" };
+const GAME_NAME: Record<string, string> = { blackjack: "Blackjack", roulette: "Roulette", slots: "Slots" };
 const METRICS = {
-  ggr: { label: "House result", help: "Chips the house kept: wagers minus payouts. Below the line, players came out ahead that day." },
-  handle: { label: "Chips wagered", help: "Every chip bet at the tables." },
-  players: { label: "Players at the tables", help: "Distinct players who placed at least one bet." },
-  signups: { label: "New players", help: "Accounts that opened the casino for the first time." },
+  ggr: { label: "House result", unit: "chips", help: "Chips the house kept: wagers minus payouts." },
+  handle: { label: "Wagered", unit: "chips", help: "Every chip bet at the tables." },
+  players: { label: "Players", unit: "players", help: "Distinct players who placed at least one bet." },
+  signups: { label: "New players", unit: "new players", help: "Accounts that opened the casino for the first time." },
 } as const;
+type Metric = keyof typeof METRICS;
 
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
-  return (
-    <Card variant="default">
-      <Card.Content className="grid w-full gap-1 p-4">
-        <span className="text-default-500 text-xs font-medium">{label}</span>
-        <span className={`num text-2xl font-bold tracking-tight ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}>{value}</span>
-        {sub ? <span className="text-default-500 num text-xs">{sub}</span> : null}
-      </Card.Content>
-    </Card>
-  );
+const pct = (n: number | null) => (n === null ? "–" : `${(n * 100).toFixed(1)}%`);
+
+/** The period toggle sits in the Casino heading (the layout's slot). */
+function HeadSlot({ children }: { children: React.ReactNode }) {
+  const el = useContext(CasinoHeadSlot);
+  return el ? createPortal(children, el) : null;
 }
 
-function Toggle<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: [T, string][]; label: string }) {
-  return (
-    <div role="group" aria-label={label} className="bg-default-100 flex gap-0.5 rounded-lg p-0.5">
-      {options.map(([key, text]) => (
-        <Button key={key} size="sm" variant={value === key ? "secondary" : "ghost"} aria-pressed={value === key} onPress={() => onChange(key)}>
-          {text}
-        </Button>
-      ))}
-    </div>
-  );
-}
-
-export default function OverviewPage() {
-  const router = useRouter();
+export default function CasinoOverviewPage() {
   const [days, setDays] = useState<"7" | "30" | "90">("30");
-  const [metric, setMetric] = useState<keyof typeof METRICS>("ggr");
+  const [metric, setMetric] = useState<Metric>("ggr");
   const { data } = useAdmin<Overview>(`/overview?days=${days}`, 60_000);
+  useBusy(!data);
+
+  const toggle = (
+    <HeadSlot>
+      <Seg
+        label="Period"
+        value={days}
+        onChange={setDays}
+        options={[
+          ["7", "7 days"],
+          ["30", "30 days"],
+          ["90", "90 days"],
+        ]}
+      />
+    </HeadSlot>
+  );
 
   if (!data) {
     return (
-      <div className="grid gap-5">
-        <Skeleton className="h-9 w-48 rounded-lg" />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
+      <>
+        {toggle}
+        <div className="kpis" aria-hidden="true">
+          <Sk h={96} />
+          <Sk h={96} />
+          <Sk h={96} />
+          <Sk h={96} />
         </div>
-        <Skeleton className="h-72 rounded-xl" />
-      </div>
+        <div className="cols" aria-hidden="true">
+          <Sk h={300} />
+          <Sk h={220} />
+        </div>
+      </>
     );
   }
 
   const p = data.players;
   const m = METRICS[metric];
+  const values = data.daily.map((d) => d[metric]);
+  const labels = data.daily.map((d) => dayMonth(Date.parse(`${d.day}T12:00:00Z`)));
 
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-          <p className="text-default-500">Play-money figures across Planary Casino. Days follow Zurich time.</p>
+      {toggle}
+      <section className="kpis" aria-label="Casino figures">
+        <div className="kpi">
+          <span className="kpi-l">Players online</span>
+          <span className="kpi-v">{num(p.online)}</span>
+          <span className="kpi-s">{num(p.players)} registered</span>
         </div>
-        <Toggle
-          label="Period"
-          value={days}
-          onChange={setDays}
-          options={[
-            ["7", "7 days"],
-            ["30", "30 days"],
-            ["90", "90 days"],
-          ]}
-        />
-      </header>
-
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Key figures">
-        <Kpi label="Players online" value={chips(p.online)} sub={`${chips(p.players)} registered`} />
-        <Kpi label="New players" value={chips(p.new_today)} sub={`${chips(p.new_week)} in 7 days`} />
-        <Kpi label="Wagered today" value={chips(data.today.handle)} sub={`${chips(data.today.players)} players, ${chips(data.today.bets)} bets`} />
-        <Kpi label="House result today" value={signed(data.today.ggr)} tone={data.today.ggr >= 0 ? "up" : "down"} sub={`RTP ${pct(data.today.rtp)}`} />
-        <Kpi label="Chips in circulation" value={chips(p.circulation)} sub="All player balances" />
-        <Kpi label="Restricted accounts" value={chips(p.restricted)} sub="Suspended or closed" />
+        <div className="kpi">
+          <span className="kpi-l">New players</span>
+          <span className="kpi-v">{num(p.new_today)}</span>
+          <span className="kpi-s">{num(p.new_week)} in 7 days</span>
+        </div>
+        <div className="kpi">
+          <span className="kpi-l">Wagered today</span>
+          <span className="kpi-v">{num(data.today.handle)}</span>
+          <span className="kpi-s">
+            {num(data.today.players)} players, {num(data.today.bets)} bets
+          </span>
+        </div>
+        <div className="kpi">
+          <span className="kpi-l">House result today</span>
+          <span className="kpi-v">{signedNum(data.today.ggr)}</span>
+          <span className="kpi-s">RTP {pct(data.today.rtp)}</span>
+        </div>
       </section>
 
-      <Card>
-        <Card.Header>
-          <div className="flex w-full flex-wrap items-start justify-between gap-3">
-          <div>
-            <Card.Title>
-              {m.label}, last {data.days} days
-            </Card.Title>
-            <Card.Description>{m.help}</Card.Description>
-          </div>
-          <Toggle
-            label="Chart"
-            value={metric}
-            onChange={setMetric}
-            options={[
-              ["ggr", "Result"],
-              ["handle", "Wagered"],
-              ["players", "Players"],
-              ["signups", "Sign-ups"],
-            ]}
-          />
-          </div>
-        </Card.Header>
-        <Card.Content>
-          <BarChart data={data.daily.map((d) => ({ day: d.day, value: d[metric] }))} label={m.label} />
-        </Card.Content>
-      </Card>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <Card.Header>
-            <div className="flex w-full items-center justify-between gap-3">
-              <Card.Title>Games, last {data.days} days</Card.Title>
-              <Button size="sm" variant="secondary" onPress={() => router.push("/casino/games")}>
-                Details
-              </Button>
+      <div className="cols">
+        <section className="box" aria-labelledby="cw-h">
+          <div className="chart-h">
+            <div>
+              <h2 id="cw-h" className="box-t">
+                {m.label}, last {data.days} days
+              </h2>
+              <p className="box-s" style={{ marginTop: 4 }}>
+                {m.help}
+              </p>
             </div>
-          </Card.Header>
-          <Card.Content className="w-full px-0">
-            <Table>
-              <Table.ScrollContainer>
-                <Table.Content aria-label="Games">
-                  <Table.Header>
-                    <Table.Column isRowHeader>Game</Table.Column>
-                    <Table.Column>Wagered</Table.Column>
-                    <Table.Column>Result</Table.Column>
-                    <Table.Column>RTP</Table.Column>
-                    <Table.Column>Expected</Table.Column>
-                  </Table.Header>
-                  <Table.Body>
-                    {data.perGame.map((g) => (
-                      <Table.Row key={g.game}>
-                        <Table.Cell>{GAME_NAME[g.game] ?? g.game}</Table.Cell>
-                        <Table.Cell className="num">{chips(g.handle)}</Table.Cell>
-                        <Table.Cell className={`num ${g.ggr >= 0 ? "text-success" : "text-danger"}`}>{signed(g.ggr)}</Table.Cell>
-                        <Table.Cell className="num">{pct(g.rtp)}</Table.Cell>
-                        <Table.Cell className="num text-default-500">{pct(g.theoretical)}</Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
-          </Card.Content>
-          <Card.Footer>
-            <p className="text-default-500 text-xs">Short-term RTP swings around the expected value; it settles as the number of bets grows.</p>
-          </Card.Footer>
-        </Card>
-
-        <Card>
-          <Card.Header>
-            <Card.Title>Chip flow, last {data.days} days</Card.Title>
-          </Card.Header>
-          <Card.Content className="w-full">
-            <dl className="divide-default-200 divide-y">
-              {[
-                ["Welcome chips issued", `+${chips(data.issued.starter)}`, ""],
-                ["Daily bonuses issued", `+${chips(data.issued.bonus)}`, ""],
-                ["Staff adjustments", signed(data.issued.adjustments), ""],
-                ["House result at the tables", `${signed(-data.period.ggr)} to players`, data.period.ggr >= 0 ? "text-danger" : "text-success"],
-                ["Spent in the shop", `−${chips(data.issued.spentInShop)}`, ""],
-              ].map(([label, value, tone]) => (
-                <div key={label} className="flex items-center justify-between gap-4 py-2.5">
-                  <dt className="text-default-600">{label}</dt>
-                  <dd className={`num font-semibold ${tone}`}>{value}</dd>
-                </div>
-              ))}
-            </dl>
-          </Card.Content>
-        </Card>
+            <Seg
+              label="Chart"
+              value={metric}
+              onChange={setMetric}
+              options={[
+                ["ggr", "Result"],
+                ["handle", "Wagered"],
+                ["players", "Players"],
+                ["signups", "Sign-ups"],
+              ]}
+            />
+          </div>
+          <Bars values={values} label={`${m.label} per day, last ${data.days} days`} titles={values.map((v, i) => `${labels[i]}: ${metric === "ggr" ? signedNum(v) : num(v)} ${m.unit}`)} />
+          <div className="axis">
+            <span>{labels[0]}</span>
+            <span>{labels[Math.floor((labels.length - 1) / 2)]}</span>
+            <span>Today</span>
+          </div>
+        </section>
+        <section className="box" aria-labelledby="ci-h">
+          <div className="box-h">
+            <h2 id="ci-h" className="box-t">
+              Chips issued, {data.days} days
+            </h2>
+          </div>
+          <dl className="kv">
+            <dt>Starter chips</dt>
+            <dd className="num">{num(data.issued.starter)}</dd>
+            <dt>Daily bonus</dt>
+            <dd className="num">{num(data.issued.bonus)}</dd>
+            <dt>Staff adjustments</dt>
+            <dd className="num">{signedNum(data.issued.adjustments)}</dd>
+            <dt>Spent in the shop</dt>
+            <dd className="num">−{num(data.issued.spentInShop)}</dd>
+            <dt>House result</dt>
+            <dd className="num">{signedNum(data.period.ggr)}</dd>
+            <dt>In circulation</dt>
+            <dd className="num">{num(p.circulation)}</dd>
+            <dt>Restricted accounts</dt>
+            <dd className="num">{num(p.restricted)}</dd>
+          </dl>
+        </section>
       </div>
+
+      <section className="box" aria-labelledby="pg-h">
+        <div className="box-h">
+          <h2 id="pg-h" className="box-t">
+            Per game
+          </h2>
+          <span className="box-s">RTP against the theoretical value</span>
+        </div>
+        <Table
+          cols="minmax(0,1.4fr) 1fr 1fr 80px 80px"
+          colsS="minmax(0,1fr) auto auto 52px"
+          head={[{ h: "Game" }, { h: "Wagered", r: true }, { h: "House result", r: true }, { h: "RTP", r: true }, { h: "Expected", r: true, hide: true }]}
+        >
+          {data.perGame.map((g) => (
+            <tr className="dt-r" key={g.game}>
+              <Td>
+                <b>{GAME_NAME[g.game] ?? g.game}</b>
+              </Td>
+              <Td r>{num(g.handle)}</Td>
+              <Td r>{signedNum(g.ggr)}</Td>
+              <Td r>{pct(g.rtp)}</Td>
+              <Td r hide>
+                {pct(g.theoretical)}
+              </Td>
+            </tr>
+          ))}
+        </Table>
+      </section>
     </>
   );
 }

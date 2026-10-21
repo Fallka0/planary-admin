@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import type { ReactNode } from "react";
 import { useTheme } from "next-themes";
 import { CONSOLE } from "@/design/console-copy";
@@ -77,8 +77,12 @@ function active(pathname: string, id: string) {
 
 function ThemeButton() {
   const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
+  // The theme is only known in the browser; render the light icon on the server.
+  const mounted = useSyncExternalStore(
+    () => () => {},
+    () => true,
+    () => false,
+  );
   const dark = mounted && resolvedTheme === "dark";
   return (
     <button className="ib" type="button" aria-label={dark ? CONSOLE.theme.light : CONSOLE.theme.dark} onClick={() => setTheme(dark ? "light" : "dark")}>
@@ -92,8 +96,12 @@ function Search() {
   const router = useRouter();
   const input = useRef<HTMLInputElement>(null);
   const [q, setQ] = useState("");
-  const [results, setResults] = useState<SearchResult[] | null>(null);
+  // Results belong to the term they were found for, so a shorter or newer term never shows stale ones.
+  const [found, setFound] = useState<{ term: string; results: SearchResult[] } | null>(null);
   const [sel, setSel] = useState(0);
+  const term = q.trim();
+  const results = found && term.length >= 2 && found.term === term ? found.results : null;
+  const setResults = (r: null) => setFound(r);
 
   // "/" focuses the search from anywhere outside a text field.
   useEffect(() => {
@@ -109,23 +117,23 @@ function Search() {
   }, []);
 
   useEffect(() => {
-    const term = q.trim();
-    if (term.length < 2) {
-      setResults(null);
-      return;
-    }
+    if (term.length < 2) return;
     let alive = true;
     const timer = window.setTimeout(() => {
       orgCall<{ results: SearchResult[] }>(accessToken, "GET", `/console/search?q=${encodeURIComponent(term)}`).then(
-        (r) => alive && (setResults(r.results), setSel(0)),
-        () => alive && setResults([]),
+        (r) => {
+          if (!alive) return;
+          setFound({ term, results: r.results });
+          setSel(0);
+        },
+        () => alive && setFound({ term, results: [] }),
       );
     }, 200);
     return () => {
       alive = false;
       window.clearTimeout(timer);
     };
-  }, [q, accessToken]);
+  }, [term, accessToken]);
 
   function go(r: SearchResult) {
     setQ("");
@@ -157,10 +165,11 @@ function Search() {
             if (e.key === "Escape") setQ("");
             return;
           }
-          if (e.key === "ArrowDown") (e.preventDefault(), setSel((s) => (s + 1) % results.length));
-          else if (e.key === "ArrowUp") (e.preventDefault(), setSel((s) => (s - 1 + results.length) % results.length));
-          else if (e.key === "Enter") (e.preventDefault(), go(results[sel]));
-          else if (e.key === "Escape") setResults(null);
+          if (e.key === "Escape") return setResults(null);
+          if (!["ArrowDown", "ArrowUp", "Enter"].includes(e.key)) return;
+          e.preventDefault();
+          if (e.key === "Enter") go(results[sel]);
+          else setSel((s) => (s + (e.key === "ArrowDown" ? 1 : results.length - 1)) % results.length);
         }}
         onBlur={() => window.setTimeout(() => setResults(null), 150)}
       />
@@ -212,21 +221,23 @@ export function Shell({ children }: { children: ReactNode }) {
   const { data: me, error } = useOrg<ConsoleMe>("/console/me");
   const { data: status } = useOrg<StatusResponse>(me ? "/console/status" : null, 60_000);
   const { data: counts } = useOrg<{ counts: { open: number } }>(me && me.access.support !== "none" ? "/console/support?status=open" : null, 60_000);
-  const [menu, setMenu] = useState(false);
+  // The menu belongs to the page it was opened on, so navigating closes it.
+  const [menuAt, setMenuAt] = useState<string | null>(null);
+  const menu = menuAt === pathname;
+  const setMenu = (open: boolean) => setMenuAt(open ? pathname : null);
   const [busy, setBusyState] = useState(false);
   const closeRef = useRef<HTMLButtonElement>(null);
   const menuBtn = useRef<HTMLButtonElement>(null);
 
   const setBusy = useCallback((b: boolean) => setBusyState(b), []);
 
-  // Close the phone menu on navigation; Esc closes it too and hands focus back.
-  useEffect(() => setMenu(false), [pathname]);
+  // Esc closes the phone menu and hands focus back.
   useEffect(() => {
     if (!menu) return;
     closeRef.current?.focus();
     const onKey = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
-        setMenu(false);
+        setMenuAt(null);
         menuBtn.current?.focus();
       }
     };
@@ -363,7 +374,7 @@ export function Shell({ children }: { children: ReactNode }) {
                       <span className="l">{CONSOLE.readOnly}</span>
                     </span>
                   ) : null}
-                  <Link className={`sys${downService ? " err" : ""}`} href="/status">
+                  <Link className={`sys${downService ? " err" : ""}`} href="/status" aria-label={`Status: ${downService ? `${downService.name} down` : status ? CONSOLE.sysUp : "checking"}`}>
                     <span className={`dot ${downService ? "err" : "ok"}`} />
                     <span className="l">{downService ? `${downService.name} down` : status ? CONSOLE.sysUp : "Checking"}</span>
                   </Link>
