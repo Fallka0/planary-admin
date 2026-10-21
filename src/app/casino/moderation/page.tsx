@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Button, Card, Skeleton, toast } from "@heroui/react";
-import { useStaff } from "@/components/Shell";
+import { useStaff } from "@/components/CasinoStaff";
 import { Avatar, Empty, StatusChip } from "@/components/ui";
 import { avatarSrc, type Badge, useAdmin, useAdminAction } from "@/lib/api";
 import { chips, date, dateTime } from "@/lib/format";
@@ -39,7 +39,7 @@ export default function ModerationPage() {
   return (
     <>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Moderation</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Moderation</h2>
         <p className="text-default-500">Recent profile pictures and bios, and every account with a restriction.</p>
       </header>
 
@@ -57,7 +57,7 @@ export default function ModerationPage() {
                 <li key={a.id} className="bg-default-100 grid justify-items-center gap-1.5 rounded-xl p-2.5 text-center">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={avatarSrc(a.avatar) ?? ""} alt={`${a.name}'s picture`} width={120} height={120} loading="lazy" className="aspect-square w-full rounded-lg object-cover" />
-                  <Link href={`/players/${a.id}`} className="truncate text-sm hover:underline">
+                  <Link href={`/casino/players/${a.id}`} className="truncate text-sm hover:underline">
                     {a.name}
                   </Link>
                   <span className="text-default-500 text-xs">{date(a.updatedAt)}</span>
@@ -85,7 +85,7 @@ export default function ModerationPage() {
                   <li key={b.id} className="flex items-center gap-3 py-2.5">
                     <Avatar player={b} />
                     <div className="min-w-0 flex-1">
-                      <Link href={`/players/${b.id}`} className="text-default-500 text-xs hover:underline">
+                      <Link href={`/casino/players/${b.id}`} className="text-default-500 text-xs hover:underline">
                         {b.name}
                       </Link>
                       <p className="truncate">{b.bio}</p>
@@ -111,7 +111,7 @@ export default function ModerationPage() {
               <ul className="divide-default-200 divide-y">
                 {data.restricted.map((r) => (
                   <li key={r.id} className="flex items-center gap-3 py-2.5">
-                    <Link href={`/players/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3">
+                    <Link href={`/casino/players/${r.id}`} className="flex min-w-0 flex-1 items-center gap-3">
                       <Avatar player={r} />
                       <span className="min-w-0">
                         <span className="block truncate font-medium">{r.name}</span>

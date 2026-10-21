@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Alert, Button, Card, Description, Input, Label, Modal, Skeleton, TextArea, TextField, toast } from "@heroui/react";
-import { useStaff } from "@/components/Shell";
+import { useStaff } from "@/components/CasinoStaff";
 import { Empty } from "@/components/ui";
 import { ApiError, useAdmin, useAdminAction } from "@/lib/api";
 import { chips, dateTime } from "@/lib/format";
@@ -46,7 +46,7 @@ export default function AnnouncementsPage() {
   return (
     <>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Announcements</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Announcements</h2>
         <p className="text-default-500">A message in every active player&apos;s notifications: new games, maintenance windows, events.</p>
       </header>
 

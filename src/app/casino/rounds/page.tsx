@@ -148,7 +148,7 @@ function Detail({ id, onClose }: { id: string; onClose: () => void }) {
                       {data.players.map((p) => (
                         <li key={`${p.userId}-${p.seat}`} className="bg-default-100 grid gap-1 rounded-lg p-3 text-sm">
                           <div className="flex flex-wrap items-center justify-between gap-2">
-                            <Link href={`/players/${p.userId}`} className="font-medium underline-offset-4 hover:underline">
+                            <Link href={`/casino/players/${p.userId}`} className="font-medium underline-offset-4 hover:underline">
                               {p.name ?? p.userId.slice(0, 8)}
                             </Link>
                             <span className={`num font-semibold ${p.returned - p.staked >= 0 ? "text-success" : "text-danger"}`}>
@@ -232,7 +232,7 @@ function Rounds() {
   return (
     <>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Game rounds</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Game rounds</h2>
         <p className="text-default-500">
           Every hand and every spin, exactly as it was played. Records are written once and cannot be edited — a correction is a
           new record, never a changed one.

@@ -77,7 +77,7 @@ export default function TransactionsPage() {
     <>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Transactions</h1>
+          <h2 className="text-2xl font-bold tracking-tight">Transactions</h2>
           <p className="text-default-500">Every chip movement, newest first. Nothing here can be edited; corrections are new adjustments.</p>
         </div>
         <Button variant="secondary" isDisabled={!data?.entries.length} onPress={exportCsv}>
@@ -142,7 +142,7 @@ export default function TransactionsPage() {
                   <Table.Row key={r.id}>
                     <Table.Cell className="num text-default-500">{dateTime(r.created_at)}</Table.Cell>
                     <Table.Cell>
-                      <Link href={`/players/${r.user_id}`} className="text-accent font-medium hover:underline">
+                      <Link href={`/casino/players/${r.user_id}`} className="text-accent font-medium hover:underline">
                         {r.name}
                       </Link>
                     </Table.Cell>

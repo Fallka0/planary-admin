@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { Alert, Button, Card, Chip, Description, Input, Label, Link as HeroLink, Modal, Skeleton, Table, TextField, toast } from "@heroui/react";
-import { useStaff } from "@/components/Shell";
+import { useStaff } from "@/components/CasinoStaff";
 import { Avatar, StatusChip } from "@/components/ui";
 import { ApiError, type Badge, type Figures, useAdmin, useAdminAction } from "@/lib/api";
 import { chips, pct, signed } from "@/lib/format";
@@ -111,7 +111,7 @@ export default function GamesPage() {
   return (
     <>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Games</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Games</h2>
         <p className="text-default-500">Status, results against the expected return, and who is at a table right now.</p>
       </header>
 
@@ -175,7 +175,7 @@ export default function GamesPage() {
                       </span>
                       <span className="flex flex-wrap gap-1.5">
                         {t.players.map((pl) => (
-                          <Link key={pl.id} href={`/players/${pl.id}`}>
+                          <Link key={pl.id} href={`/casino/players/${pl.id}`}>
                             <Chip>
                               <Avatar player={pl} size="xs" /> {pl.name}
                             </Chip>

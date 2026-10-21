@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Alert, Button, Card, Description, Input, Label, Skeleton, Table, TextField } from "@heroui/react";
-import { useStaff } from "@/components/Shell";
+import { useStaff } from "@/components/CasinoStaff";
 import { ActionModal, BarChart, Empty, Segmented, useRun } from "@/components/ui";
 import { useAdmin } from "@/lib/api";
 import { chips, dateTime, signed } from "@/lib/format";
@@ -137,7 +137,7 @@ export default function BankPage() {
     <>
       <header className="flex flex-wrap items-end justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Bank</h1>
+          <h2 className="text-2xl font-bold tracking-tight">Bank</h2>
           <p className="text-default-500">
             The house&apos;s account. Bets at the house games, cases and the market fee go in, winnings come out. Poker pots pass between players and never touch it.
           </p>

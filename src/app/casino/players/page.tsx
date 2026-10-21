@@ -63,7 +63,7 @@ function Players() {
   return (
     <>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Players</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Players</h2>
         <p className="text-default-500">Search, then open a player to see their history, adjust chips or restrict the account.</p>
       </header>
 
@@ -139,7 +139,7 @@ function Players() {
                 {data.players.map((p) => (
                   <Table.Row key={p.id}>
                     <Table.Cell>
-                      <Link href={`/players/${p.id}`} className="rounded-lg outline-offset-4">
+                      <Link href={`/casino/players/${p.id}`} className="rounded-lg outline-offset-4">
                         <Who player={p} sub={p.title ?? p.id.slice(0, 8)} />
                       </Link>
                     </Table.Cell>

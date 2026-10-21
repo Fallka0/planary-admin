@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Button, Card, Chip, Description, Input, Label, Skeleton, Table, TextField, toast } from "@heroui/react";
-import { useStaff } from "@/components/Shell";
+import { useStaff } from "@/components/CasinoStaff";
 import { ApiError, useAdmin, useAdminAction } from "@/lib/api";
 import { chips } from "@/lib/format";
 
@@ -138,7 +138,7 @@ export default function EconomyPage() {
   return (
     <>
       <header>
-        <h1 className="text-2xl font-bold tracking-tight">Economy &amp; market</h1>
+        <h2 className="text-2xl font-bold tracking-tight">Economy &amp; market</h2>
         <p className="text-default-500">How many free chips come in, and what cases and the market take back out.</p>
       </header>
 

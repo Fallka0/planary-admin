@@ -4,7 +4,7 @@ import Link from "next/link";
 import { use, useState } from "react";
 import { Alert, Button, Card, Chip, Description, Input, Label, Link as HeroLink, Separator, Skeleton, Table, Tabs, TextArea, TextField, toast } from "@heroui/react";
 import { ArrowLeft, Copy } from "lucide-react";
-import { useStaff } from "@/components/Shell";
+import { useStaff } from "@/components/CasinoStaff";
 import { ActionModal, Avatar, Empty, Loading, Segmented, StatusChip, useRun } from "@/components/ui";
 import { ProgressPanel, ResetDialog } from "./progress";
 import { ApiError, type Badge, type LedgerRow, useAdmin, useAdminAction } from "@/lib/api";
@@ -508,7 +508,7 @@ function summarise(details: string) {
   }
 }
 
-export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
+export default function PlayerPage({ params }: PageProps<"/casino/players/[id]">) {
   const { id } = use(params);
   const staff = useStaff();
   const act = useAdminAction();
@@ -533,7 +533,7 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
 
   return (
     <>
-      <Link href="/players" className="text-default-500 hover:text-foreground flex w-fit items-center gap-1.5 text-sm">
+      <Link href="/casino/players" className="text-default-500 hover:text-foreground flex w-fit items-center gap-1.5 text-sm">
         <ArrowLeft className="size-4" /> Players
       </Link>
 
@@ -541,7 +541,7 @@ export default function PlayerPage({ params }: PageProps<"/players/[id]">) {
         <Card.Content className="flex w-full flex-row flex-wrap items-center gap-4 p-5">
           <Avatar player={p} size="lg" />
           <div className="min-w-[14rem] flex-1 grid gap-1.5">
-            <h1 className="text-2xl font-bold tracking-tight">{p.name}</h1>
+            <h2 className="text-2xl font-bold tracking-tight">{p.name}</h2>
             <div className="flex flex-wrap items-center gap-1.5">
               <StatusChip status={p.status} />
               {p.mutedUntil ? <StatusChip status="muted" /> : null}

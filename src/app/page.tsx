@@ -1,86 +1,108 @@
 "use client";
 
-import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useState } from "react";
-import { Button, Card, Skeleton, Table } from "@heroui/react";
-import { BarChart } from "@/components/ui";
-import { type Figures, useAdmin } from "@/lib/api";
-import { chips, pct, signed } from "@/lib/format";
+import { useBusy, useConsole } from "@/components/console/Shell";
+import { Bars, Chip, ErrorCard, Ic, LoadingNote, PageHead, Seg, Sk, Spark, StateChip, Table, Td } from "@/components/console/ui";
+import { CONSOLE } from "@/design/console-copy";
+import type { IconName } from "@/design/icons";
+import { dayMonth, initials, num, pct, shortWhen, time } from "@/lib/fmt";
+import { now, useOrg } from "@/lib/org";
+import type { OverviewResponse } from "@/lib/org-contract";
 
-interface Overview {
-  days: number;
-  players: { players: number; circulation: number; online: number; new_today: number; new_week: number; restricted: number };
-  today: Figures;
-  week: Figures;
-  period: Figures;
-  issued: { starter: number; bonus: number; adjustments: number; spentInShop: number };
-  perGame: (Figures & { game: string; theoretical: number })[];
-  daily: { day: string; handle: number; ggr: number; players: number; signups: number }[];
-}
+const DAY = 86_400_000;
+const APP: Record<string, { name: string; ic: IconName }> = {
+  tournament: { name: "Tournament", ic: "bracket" },
+  casino: { name: "Casino", ic: "chip" },
+  wishlist: { name: "Wishlist", ic: "gift" },
+};
 
-const GAME_NAME: Record<string, string> = { blackjack: "Blackjack", roulette: "Roulette" };
-const METRICS = {
-  ggr: { label: "House result", help: "Chips the house kept: wagers minus payouts. Below the line, players came out ahead that day." },
-  handle: { label: "Chips wagered", help: "Every chip bet at the tables." },
-  players: { label: "Players at the tables", help: "Distinct players who placed at least one bet." },
-  signups: { label: "New players", help: "Accounts that opened the casino for the first time." },
-} as const;
-
-function Kpi({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: "up" | "down" }) {
+function Loading() {
   return (
-    <Card variant="default">
-      <Card.Content className="grid w-full gap-1 p-4">
-        <span className="text-default-500 text-xs font-medium">{label}</span>
-        <span className={`num text-2xl font-bold tracking-tight ${tone === "up" ? "text-success" : tone === "down" ? "text-danger" : ""}`}>{value}</span>
-        {sub ? <span className="text-default-500 num text-xs">{sub}</span> : null}
-      </Card.Content>
-    </Card>
+    <>
+      <div className="kpis" aria-hidden="true">
+        <Sk h={96} className="sk-k" />
+        <Sk h={96} className="sk-k" />
+        <Sk h={96} className="sk-k" />
+        <Sk h={96} className="sk-k" />
+      </div>
+      <div className="cols sec" aria-hidden="true">
+        <Sk h={300} />
+        <Sk h={300} />
+      </div>
+      <div className="sec" aria-hidden="true">
+        <Sk h={220} />
+      </div>
+      <LoadingNote label={CONSOLE.states.loading} />
+    </>
   );
 }
 
-function Toggle<T extends string>({ value, onChange, options, label }: { value: T; onChange: (v: T) => void; options: [T, string][]; label: string }) {
+function Chart({ data }: { data: OverviewResponse }) {
+  const [series, setSeries] = useState<"signups" | "active">("signups");
+  const values = data[series];
+  const t = now();
+  const dayLabels = values.map((_, i) => dayMonth(t - (values.length - 1 - i) * DAY));
+  const total = data.signups.reduce((a, b) => a + b, 0);
+  const change = data.signupsPrev ? Math.round(((total - data.signupsPrev) / data.signupsPrev) * 100) : null;
+  const avg = Math.round(data.active.reduce((a, b) => a + b, 0) / Math.max(1, data.active.length));
+  const unit = series === "signups" ? "sign-ups" : "active users";
+  const min = Math.min(...values);
+  const max = Math.max(...values);
   return (
-    <div role="group" aria-label={label} className="bg-default-100 flex gap-0.5 rounded-lg p-0.5">
-      {options.map(([key, text]) => (
-        <Button key={key} size="sm" variant={value === key ? "secondary" : "ghost"} aria-pressed={value === key} onPress={() => onChange(key)}>
-          {text}
-        </Button>
-      ))}
-    </div>
+    <section className="box" aria-labelledby="su-h">
+      <div className="chart-h">
+        <div>
+          <h2 id="su-h" className="box-t">
+            {series === "signups" ? "Sign-ups" : "Active users"}, last {data.days} days
+          </h2>
+        </div>
+        <Seg
+          label="Chart"
+          value={series}
+          onChange={setSeries}
+          options={[
+            ["signups", "Sign-ups"],
+            ["active", "Active users"],
+          ]}
+        />
+      </div>
+      <p className="big">
+        {num(series === "signups" ? total : avg)}{" "}
+        <span className="box-s" style={{ fontFamily: "var(--body)", letterSpacing: 0 }}>
+          {series === "signups"
+            ? `in ${data.days} days${change !== null ? `, ${change >= 0 ? "+" : "−"}${Math.abs(change)}% on the ${data.days} days before` : ""}`
+            : "a day on average"}
+        </span>
+      </p>
+      <div style={{ marginTop: 16 }}>
+        <Bars
+          values={values}
+          label={`${series === "signups" ? "Sign-ups" : "Active users"} per day, last ${data.days} days, between ${num(min)} and ${num(max)} a day`}
+          titles={values.map((v, i) => `${dayLabels[i]}: ${num(v)} ${unit}`)}
+        />
+      </div>
+      <div className="axis">
+        <span>{dayLabels[0]}</span>
+        <span>{dayLabels[Math.floor((values.length - 1) / 2)]}</span>
+        <span>Today</span>
+      </div>
+    </section>
   );
 }
 
 export default function OverviewPage() {
-  const router = useRouter();
   const [days, setDays] = useState<"7" | "30" | "90">("30");
-  const [metric, setMetric] = useState<keyof typeof METRICS>("ggr");
-  const { data } = useAdmin<Overview>(`/overview?days=${days}`, 60_000);
-
-  if (!data) {
-    return (
-      <div className="grid gap-5">
-        <Skeleton className="h-9 w-48 rounded-lg" />
-        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
-          {Array.from({ length: 6 }, (_, i) => (
-            <Skeleton key={i} className="h-24 rounded-xl" />
-          ))}
-        </div>
-        <Skeleton className="h-72 rounded-xl" />
-      </div>
-    );
-  }
-
-  const p = data.players;
-  const m = METRICS[metric];
+  const { data, error, loading, reload } = useOrg<OverviewResponse>(`/console/overview?days=${days}`, 60_000);
+  useBusy(loading);
+  const { status } = useConsole();
+  const t = now();
+  const downSince = (id: string) => status?.services.find((s) => s.id === id)?.downSince ?? null;
 
   return (
     <>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Overview</h1>
-          <p className="text-default-500">Play-money figures across Planary Casino. Days follow Zurich time.</p>
-        </div>
-        <Toggle
+      <PageHead title={CONSOLE.pages.overview.title}>
+        <Seg
           label="Period"
           value={days}
           onChange={setDays}
@@ -90,107 +112,143 @@ export default function OverviewPage() {
             ["90", "90 days"],
           ]}
         />
-      </header>
+      </PageHead>
 
-      <section className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6" aria-label="Key figures">
-        <Kpi label="Players online" value={chips(p.online)} sub={`${chips(p.players)} registered`} />
-        <Kpi label="New players" value={chips(p.new_today)} sub={`${chips(p.new_week)} in 7 days`} />
-        <Kpi label="Wagered today" value={chips(data.today.handle)} sub={`${chips(data.today.players)} players, ${chips(data.today.bets)} bets`} />
-        <Kpi label="House result today" value={signed(data.today.ggr)} tone={data.today.ggr >= 0 ? "up" : "down"} sub={`RTP ${pct(data.today.rtp)}`} />
-        <Kpi label="Chips in circulation" value={chips(p.circulation)} sub="All player balances" />
-        <Kpi label="Restricted accounts" value={chips(p.restricted)} sub="Suspended or closed" />
-      </section>
-
-      <Card>
-        <Card.Header>
-          <div className="flex w-full flex-wrap items-start justify-between gap-3">
-          <div>
-            <Card.Title>
-              {m.label}, last {data.days} days
-            </Card.Title>
-            <Card.Description>{m.help}</Card.Description>
-          </div>
-          <Toggle
-            label="Chart"
-            value={metric}
-            onChange={setMetric}
-            options={[
-              ["ggr", "Result"],
-              ["handle", "Wagered"],
-              ["players", "Players"],
-              ["signups", "Sign-ups"],
-            ]}
-          />
-          </div>
-        </Card.Header>
-        <Card.Content>
-          <BarChart data={data.daily.map((d) => ({ day: d.day, value: d[metric] }))} label={m.label} />
-        </Card.Content>
-      </Card>
-
-      <div className="grid gap-5 lg:grid-cols-2">
-        <Card>
-          <Card.Header>
-            <div className="flex w-full items-center justify-between gap-3">
-              <Card.Title>Games, last {data.days} days</Card.Title>
-              <Button size="sm" variant="secondary" onPress={() => router.push("/games")}>
-                Details
-              </Button>
+      {error && !data ? (
+        <ErrorCard title="The overview didn’t load" error={error} onRetry={reload} />
+      ) : !data ? (
+        <Loading />
+      ) : (
+        <>
+          <section className="kpis" aria-label="Key figures">
+            <div className="kpi">
+              <span className="kpi-l">Accounts</span>
+              <span className="kpi-v">{num(data.accounts)}</span>
+              <span className="kpi-s">+{num(data.accountsNew7)} in 7 days</span>
             </div>
-          </Card.Header>
-          <Card.Content className="w-full px-0">
-            <Table>
-              <Table.ScrollContainer>
-                <Table.Content aria-label="Games">
-                  <Table.Header>
-                    <Table.Column isRowHeader>Game</Table.Column>
-                    <Table.Column>Wagered</Table.Column>
-                    <Table.Column>Result</Table.Column>
-                    <Table.Column>RTP</Table.Column>
-                    <Table.Column>Expected</Table.Column>
-                  </Table.Header>
-                  <Table.Body>
-                    {data.perGame.map((g) => (
-                      <Table.Row key={g.game}>
-                        <Table.Cell>{GAME_NAME[g.game] ?? g.game}</Table.Cell>
-                        <Table.Cell className="num">{chips(g.handle)}</Table.Cell>
-                        <Table.Cell className={`num ${g.ggr >= 0 ? "text-success" : "text-danger"}`}>{signed(g.ggr)}</Table.Cell>
-                        <Table.Cell className="num">{pct(g.rtp)}</Table.Cell>
-                        <Table.Cell className="num text-default-500">{pct(g.theoretical)}</Table.Cell>
-                      </Table.Row>
-                    ))}
-                  </Table.Body>
-                </Table.Content>
-              </Table.ScrollContainer>
-            </Table>
-          </Card.Content>
-          <Card.Footer>
-            <p className="text-default-500 text-xs">Short-term RTP swings around the expected value; it settles as the number of bets grows.</p>
-          </Card.Footer>
-        </Card>
+            <div className="kpi">
+              <span className="kpi-l">Active today</span>
+              <span className="kpi-v">{num(data.activeToday)}</span>
+              <span className="kpi-s">across all apps</span>
+            </div>
+            <div className="kpi">
+              <span className="kpi-l">Organisations</span>
+              <span className="kpi-v">{num(data.organisations)}</span>
+              <span className="kpi-s">{num(data.paidOrganisations)} on a paid plan</span>
+            </div>
+            <div className="kpi">
+              <span className="kpi-l">Open support requests</span>
+              <span className="kpi-v">{num(data.openRequests)}</span>
+              <span className="kpi-s">{num(data.unassignedRequests)} unassigned</span>
+            </div>
+          </section>
 
-        <Card>
-          <Card.Header>
-            <Card.Title>Chip flow, last {data.days} days</Card.Title>
-          </Card.Header>
-          <Card.Content className="w-full">
-            <dl className="divide-default-200 divide-y">
-              {[
-                ["Welcome chips issued", `+${chips(data.issued.starter)}`, ""],
-                ["Daily bonuses issued", `+${chips(data.issued.bonus)}`, ""],
-                ["Staff adjustments", signed(data.issued.adjustments), ""],
-                ["House result at the tables", `${signed(-data.period.ggr)} to players`, data.period.ggr >= 0 ? "text-danger" : "text-success"],
-                ["Spent in the shop", `−${chips(data.issued.spentInShop)}`, ""],
-              ].map(([label, value, tone]) => (
-                <div key={label} className="flex items-center justify-between gap-4 py-2.5">
-                  <dt className="text-default-600">{label}</dt>
-                  <dd className={`num font-semibold ${tone}`}>{value}</dd>
-                </div>
+          <div className="cols sec">
+            <Chart data={data} />
+            <section className="box" aria-labelledby="sr-h">
+              <div className="box-h">
+                <h2 id="sr-h" className="box-t">
+                  Open support requests
+                </h2>
+                <Link className="alink" href="/support">
+                  Inbox
+                  <Ic name="arrow-r" small />
+                </Link>
+              </div>
+              {data.requests.length ? (
+                <ul>
+                  {data.requests.map((r) => (
+                    <li className="list-r" key={r.id}>
+                      <div className="grow">
+                        <b>
+                          <Link href={`/support/${r.id}`} style={{ textDecoration: "none" }}>
+                            {r.subject}
+                          </Link>
+                        </b>
+                        <span className="s">
+                          {r.organisation?.name ?? r.from.name} · {shortWhen(r.createdAt, t)}
+                        </span>
+                      </div>
+                      {r.assignee ? (
+                        <span className="av" title={r.assignee.name}>
+                          {initials(r.assignee.name)}
+                        </span>
+                      ) : (
+                        <Chip tone="line">Unassigned</Chip>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="box-s">Nothing open.</p>
+              )}
+            </section>
+          </div>
+
+          <section className="box sec" aria-labelledby="au-h">
+            <div className="box-h">
+              <h2 id="au-h" className="box-t">
+                Active users per app
+              </h2>
+            </div>
+            <Table
+              cols="minmax(0,1.6fr) 80px 80px 80px 110px 100px"
+              colsS="minmax(0,1fr) 56px 64px 72px"
+              head={[{ h: "App" }, { h: "Today", r: true }, { h: "7 days", r: true }, { h: "30 days", r: true, hide: true }, { h: "Last 30 days", hide: true }, { h: "Service" }]}
+            >
+              {data.apps.map((a) => (
+                <tr className="dt-r" key={a.app}>
+                  <Td>
+                    <span className="who">
+                      <span className="appi">
+                        <Ic name={APP[a.app].ic} small />
+                      </span>
+                      <b>{APP[a.app].name}</b>
+                    </span>
+                  </Td>
+                  <Td r>
+                    <b>{num(a.today)}</b>
+                  </Td>
+                  <Td r>{num(a.d7)}</Td>
+                  <Td r hide>
+                    {num(a.d30)}
+                  </Td>
+                  <Td hide>
+                    <Spark values={a.spark} />
+                  </Td>
+                  <Td>
+                    <StateChip state={a.state} />
+                  </Td>
+                </tr>
               ))}
-            </dl>
-          </Card.Content>
-        </Card>
-      </div>
+            </Table>
+          </section>
+
+          <section className="sec" aria-labelledby="sv-h">
+            <div className="box-h">
+              <h2 id="sv-h" className="box-t">
+                Services
+              </h2>
+              <Link className="alink" href="/status">
+                Status
+                <Ic name="arrow-r" small />
+              </Link>
+            </div>
+            <div className="svc-strip">
+              {data.services.map((s) => (
+                <Link key={s.id} className={`svc${s.state === "down" ? " err" : ""}`} href="/status">
+                  <span className={`dot ${s.state === "down" ? "err" : s.state === "degraded" ? "warn" : s.state === "ok" ? "ok" : ""}`} />
+                  <span className="grow">
+                    <b>{s.name}</b>
+                    <span>{s.state === "down" ? (downSince(s.id) ? `Down since ${time(downSince(s.id)!)}` : "Down") : `${s.medianMs ?? "–"} ms · ${pct(s.uptime30)}`}</span>
+                  </span>
+                  <span className="sr">{s.state === "ok" ? "Up" : s.state}</span>
+                </Link>
+              ))}
+            </div>
+          </section>
+        </>
+      )}
     </>
   );
 }
