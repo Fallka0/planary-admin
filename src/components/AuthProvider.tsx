@@ -24,10 +24,15 @@ function goSignIn() {
   window.location.replace(buildAuthUrl("login", window.location.href.split("#")[0], true));
 }
 
+/** Fixture mode (local development and screenshot checks only): no sign-in, a made-up staff member. */
+const FIXTURE_SESSION =
+  process.env.NEXT_PUBLIC_CONSOLE_DATA === "fixtures" ? { user: { id: "u_mykyta", email: "mykyta@planary.ch", name: "Mykyta Pantelei" }, accessToken: "fixtures" } : null;
+
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<{ user: PlanaryUser; accessToken: string } | null>(null);
+  const [session, setSession] = useState<{ user: PlanaryUser; accessToken: string } | null>(FIXTURE_SESSION);
 
   useEffect(() => {
+    if (FIXTURE_SESSION) return;
     let active = true;
     const stored = absorbSessionFromHash() ?? loadSession();
     if (!stored) {
