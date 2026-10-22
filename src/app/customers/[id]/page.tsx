@@ -31,15 +31,22 @@ function when(t: TournamentSummary, nowMs: number) {
 function Invoices({ c }: { c: CustomerDetail }) {
   if (!c.invoices.length) return <p className="box-s" style={{ marginTop: 18 }}>No invoices yet.</p>;
   return (
-    <Table cols="minmax(0,1fr) 100px 100px 150px 60px" colsS="minmax(0,1fr) auto auto 44px" style={{ marginTop: 18 }} head={[{ h: "Invoice" }, { h: "Date", hide: true }, { h: "Amount", r: true }, { h: "Status" }, { h: "" }]}>
+    <Table cols="minmax(0,1fr) 100px 100px 150px 60px" colsS="minmax(0,1fr) auto 52px" style={{ marginTop: 18 }} head={[{ h: "Invoice" }, { h: "Date", hide: true }, { h: "Amount", r: true }, { h: "Status", hide: true }, { h: "" }]}>
       {c.invoices.map((i) => {
         const st = invoiceStatus(i);
         return (
           <tr className="dt-r" key={i.id}>
-            <Td className="mono-t">{i.number}</Td>
+            <Td>
+              <span className="mono-t">{i.number}</span>
+              {/* On phones the status moves under the number. */}
+              <span className={`cx show-s ${st.tone}`.trim()} style={{ marginTop: 6, width: "fit-content" }}>
+                <span className={`dot ${st.tone}`.trim()} />
+                {st.label}
+              </span>
+            </Td>
             <Td hide>{date(i.createdAt)}</Td>
             <Td r>{chf(i.amount)}</Td>
-            <Td>
+            <Td hide>
               <span className={`cx ${st.tone}`.trim()}>
                 <span className={`dot ${st.tone}`.trim()} />
                 {st.label}
@@ -396,6 +403,7 @@ function Customer({ id }: { id: string }) {
                 {c.billing === "overdue" ? `Invoice overdue ${c.overdueDays} day${c.overdueDays === 1 ? "" : "s"}` : BILLING[c.billing].label(c)}
               </span>
             ) : null}
+            <span>Uses {c.services.map((x) => (x === "tournament" ? "Tournament" : "Wishlist")).join(" and ")}</span>
             <span className="mono-t">{c.id}</span>
             <span>since {date(c.since)}</span>
           </p>
