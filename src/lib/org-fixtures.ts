@@ -195,6 +195,7 @@ function customers(): CustomerRow[] {
     plan: c.plan.toLowerCase() as PlanId,
     members: n(c.mem),
     tournamentsThisYear: n(c.tour),
+    services: c.plan === "Verein" ? ["tournament", "wishlist"] : ["tournament"],
     revenueYear: n(c.rev) * 100,
     billing: c.st === "overdue" ? "overdue" : c.st === "free" ? "free" : c.st === "warn" ? "card_expires" : "paid",
     overdueDays: c.st === "overdue" ? 12 : 0,

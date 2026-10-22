@@ -450,3 +450,18 @@ td.dt-c{padding:0}
 @container site (max-width:900px){.th.auto{display:none}}
 .msg-b .att{display:inline-flex;text-decoration:none}
 .ib-it{color:inherit}
+
+/* Grid stacks never grow past their column, whatever their content's minimum width. */
+.stack{grid-template-columns:minmax(0,1fr)}
+.dt .show-s{display:none}
+@container site (max-width:640px){
+.dt .show-s{display:flex}
+.dt-c .mono-t{display:block}
+}
+/* Wide screens: the content uses more of the width next to the sidebar. */
+@container site (min-width:1900px){
+.pg{max-width:1600px}
+}
+/* Long machine text in a table cell wraps instead of running out of the box. */
+.dt-c.mono-t{white-space:normal;overflow-wrap:anywhere}
+.kv dd{overflow-wrap:anywhere}
