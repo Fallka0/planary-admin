@@ -742,7 +742,7 @@ export const CONSOLE_FIXTURES = {
       "plan": "Verein",
       "mem": "3",
       "tour": "7",
-      "rev": "228",
+      "rev": "149",
       "st": "overdue",
       "stl": "Overdue 12 days",
       "since": "03.02.2026"
@@ -755,7 +755,7 @@ export const CONSOLE_FIXTURES = {
       "plan": "Verein",
       "mem": "5",
       "tour": "11",
-      "rev": "228",
+      "rev": "149",
       "st": "ok",
       "stl": "Paid",
       "since": "12.01.2026"
@@ -768,7 +768,7 @@ export const CONSOLE_FIXTURES = {
       "plan": "Event",
       "mem": "2",
       "tour": "2",
-      "rev": "98",
+      "rev": "58",
       "st": "ok",
       "stl": "Paid",
       "since": "28.08.2026"
@@ -781,7 +781,7 @@ export const CONSOLE_FIXTURES = {
       "plan": "Verein",
       "mem": "4",
       "tour": "9",
-      "rev": "228",
+      "rev": "149",
       "st": "ok",
       "stl": "Paid",
       "since": "05.03.2026"
@@ -794,7 +794,7 @@ export const CONSOLE_FIXTURES = {
       "plan": "Event",
       "mem": "1",
       "tour": "1",
-      "rev": "49",
+      "rev": "29",
       "st": "ok",
       "stl": "Paid",
       "since": "30.09.2026"
@@ -833,7 +833,7 @@ export const CONSOLE_FIXTURES = {
       "plan": "Verein",
       "mem": "6",
       "tour": "5",
-      "rev": "228",
+      "rev": "149",
       "st": "warn",
       "stl": "Card expires 11/26",
       "since": "21.04.2026"
@@ -1198,14 +1198,14 @@ export const CONSOLE_FIXTURES = {
       {
         "n": "2026-0142",
         "d": "24.09.2026",
-        "a": "CHF 228.00",
+        "a": "CHF 149.00",
         "st": "err",
         "stl": "Overdue 12 days"
       },
       {
         "n": "2026-0031",
         "d": "03.02.2026",
-        "a": "CHF 49.00",
+        "a": "CHF 29.00",
         "st": "ok",
         "stl": "Paid"
       }
@@ -1254,7 +1254,7 @@ export const CONSOLE_FIXTURES = {
       {
         "who": "Lea Graf",
         "t": "20.10. 19:41",
-        "b": "Moved from Event to Verein in September, they run about one tournament a month. Invoice 2026-0142 is overdue; Matteo says the club treasurer pays on the 25th. Keep the plan until 03.11."
+        "b": "Moved from the Tournament Pass to Plus in September, they run about one tournament a month. Invoice 2026-0142 is overdue; Matteo says the club treasurer pays on the 25th. Keep the plan until 03.11."
       },
       {
         "who": "Sven Huber",

@@ -120,5 +120,7 @@ export function shortName(name: string) {
   return rest.length ? `${first} ${rest[rest.length - 1][0]}.` : first;
 }
 
-export const PLAN_NAME = { gratis: "Gratis", event: "Event", verein: "Verein" } as const;
+/* Display names only. The ids stay gratis/event/verein until the rename lands, and there is no id for
+   Pro yet, which is why Pro cannot be sold. See docs/plans/DESIGN-PROMPT.md section 8. */
+export const PLAN_NAME = { gratis: "Free", event: "Tournament Pass", verein: "Plus" } as const;
 export const ROLE_NAME = { owner: "Owner", manager: "Manager", support: "Support", viewer: "Viewer" } as const;
