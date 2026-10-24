@@ -184,8 +184,9 @@ background:var(--frame);padding:14px;min-height:100vh;font-family:var(--body);fo
 }
 
 /* ── Console shell: an ink sidebar in both themes, so staff always know they are in the back office ── */
-.shell{display:grid;grid-template-columns:248px minmax(0,1fr);align-items:start;min-height:calc(100vh - 28px)}
-.sb{position:relative;align-self:stretch;min-height:calc(100vh - 28px);background:var(--sb);color:var(--sb-ink);display:flex;flex-direction:column;padding:18px 14px 16px;gap:18px;overflow-y:auto}
+.shell{display:grid;grid-template-columns:248px minmax(0,1fr);align-items:start;min-height:calc(100vh - 28px);background:linear-gradient(var(--sb),var(--sb)) left top/248px 100% no-repeat}
+/* The sidebar holds its place while the page scrolls (the column keeps the ink behind it) and scrolls on its own when it is taller than the window. */
+.sb{position:sticky;top:14px;align-self:start;height:calc(100vh - 28px);background:var(--sb);color:var(--sb-ink);display:flex;flex-direction:column;padding:18px 14px 16px;gap:18px;overflow-y:auto;overscroll-behavior:contain}
 .sb-brand{display:flex;align-items:center;gap:10px;padding:0 6px}
 .sb-brand .wm{font-size:18px;min-height:40px}
 .sb-app{font-size:13px;font-weight:600;color:var(--sb-t2);padding-left:10px;border-left:1px solid #34343c;line-height:18px}
@@ -384,9 +385,9 @@ background:var(--frame);padding:14px;min-height:100vh;font-family:var(--body);fo
 .role-d{grid-template-columns:repeat(2,minmax(0,1fr))}
 }
 @container site (max-width:900px){
-.shell{grid-template-columns:minmax(0,1fr)}
+.shell{grid-template-columns:minmax(0,1fr);background:none}
 .sb{display:none}
-.sb.open{display:flex;position:fixed;inset:8px;z-index:50;height:auto;min-height:0;border-radius:16px}
+.sb.open{display:flex;position:fixed;inset:8px;z-index:50;align-self:stretch;height:auto;min-height:0;border-radius:16px}
 .inbox.has-sel .ib-list{display:none}
 .th-back{display:inline-flex}
 .tb{padding:0 12px 0 8px}
@@ -418,6 +419,13 @@ background:var(--frame);padding:14px;min-height:100vh;font-family:var(--body);fo
 .appi{display:none}
 .inc>:nth-child(3){display:none}
 .th-meta .cx{max-width:100%}
+}
+/* Short windows: tighten the sidebar so the whole menu, the account row included, still fits without scrolling. */
+@media (max-height:760px){
+.sb{gap:12px;padding:14px 14px 12px}
+.sb a.nl{height:34px}
+.sb-g{padding-bottom:3px}
+.sb-me{padding-top:10px}
 }
 @media (max-width:640px){.pl{padding:8px}}
 @media (prefers-reduced-motion:reduce){.pl *{transition-duration:0ms !important;animation:none !important}}
