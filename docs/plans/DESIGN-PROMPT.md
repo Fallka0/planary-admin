@@ -203,10 +203,24 @@ lift it without losing what they were doing.
 | 1 | A solo organiser has no organisation, but checkout is organisation-scoped. | **Settled:** checkout creates the organisation inline, in one step, named by the buyer. Invoices and the billing contact need it. |
 | 2 | What happens to a finished tournament when its Tournament Pass is spent. | It keeps everything it had, forever, read-only beyond the plan's limits. A pass is never retroactively removed. |
 | 3 | Do Plus and Pro renew automatically. | Yes, with a reminder 30 days ahead, and cancelling is one click in the portal, not an email to support. |
-| 4 | TWINT, which `PaymentMethod.kind` already allows. | Design the card and invoice paths. Leave room for a third button, do not draw it yet. |
+| 4 | TWINT, which `PaymentMethod.kind` already allows. | **Settled: on the pass, not on a subscription.** A private TWINT account may not take business payments; it needs a merchant registration with TWINT Acquiring AG, which is possible without a Handelsregister entry, at about 1.3 per cent. Stripe covers card and TWINT in one onboarding, and invoice with a Swiss QR-bill stays the backbone for Plus and Pro. Stripe's own pages disagree on whether TWINT supports recurring payments, so until that is confirmed it is one-off only. |
 | 5 | Does the pass stack, two passes for two tournaments at once. | Yes, one pass per tournament, no limit on how many. |
 | 6 | Wishlist at 3 lists on Free. | Yes, but it is never mentioned on the pricing cards. It belongs in the comparison table only. |
 | 7 | Do the plan ids move now. | **Settled, not yet.** Design with the names in section 4; the ids stay `gratis` / `event` / `verein` until the screens are real, then move in one go. See section 8. |
+
+## 7b. The design that came back
+
+A handoff built from this brief exists (`planary-plans-pricing`: BRIEF, SCREENS, KICKOFF, content as JSON and
+TS, CSS, 29 boards and 34 screenshots). It carries the decisions above: Free, Plus, Pro and the Tournament
+Pass, the four-card pricing page, the comparison table with the three Pro service rows, TWINT on the pass, and
+checkout creating the organisation inline.
+
+Two gaps in it, both deliberate:
+
+- A plan page for an organisation on Pro, and a Pro checkout, are not drawn. Pro is on the pricing page, in the
+  table and as one line in the portal.
+- Pro cannot ship before the rename in section 8, because `PlanId` has no `pro`. Free and Plus can ship on the
+  current ids with the new display names.
 
 ## 8. What moves in code after the design lands
 
