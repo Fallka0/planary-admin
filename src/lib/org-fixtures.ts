@@ -223,7 +223,7 @@ function customer(id: string): CustomerDetail {
           amount: Math.round(n(i.a.replace("CHF", "")) * 100),
           currency: "CHF" as const,
           status: i.st === "err" ? ("open" as const) : ("paid" as const),
-          description: k === 0 ? "Plan Verein, 3.2.2026 bis 2.2.2027" : "Plan Event, Gurten LAN Warm-up",
+          description: k === 0 ? "Plan Plus, 3.2.2026 bis 2.2.2027" : "Tournament Pass, Gurten LAN Warm-up",
           overdueDays: i.st === "err" ? 12 : 0,
           pdfUrl: "#",
           payUrl: "#",

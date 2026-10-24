@@ -11,7 +11,7 @@ import { chf, date, dayMonth, dayTime, initials, lastSeen, num, PLAN_NAME } from
 import { now, useOrg } from "@/lib/org";
 import type { CustomerDetail, Invoice, PlanId, TournamentSummary } from "@/lib/org-contract";
 
-const PRICE: Record<PlanId, string> = { gratis: "free", event: "CHF 49 per tournament", verein: "CHF 19 / month, billed yearly" };
+const PRICE: Record<PlanId, string> = { gratis: "free", event: "CHF 29 once, for one tournament", verein: "CHF 149 a year, one invoice" };
 type Tab = "overview" | "members" | "tournaments" | "billing" | "support";
 
 function invoiceStatus(i: Invoice) {
