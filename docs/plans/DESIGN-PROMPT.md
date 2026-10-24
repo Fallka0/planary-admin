@@ -48,34 +48,63 @@ The Console is English. No em dashes, no exclamation marks, no emoji in visible 
 - Current placeholder prices: CHF 49 per tournament, CHF 19 a month billed yearly.
   **These are replaced, see section 4.**
 
-## 3. Packaging decision: one plan for the organisation, not one per app
+## 3. Packaging: one subscription per organisation, with add-ons
 
 Design one subscription that belongs to the organisation and lifts limits in every app the
-organisation has switched on. Do not design per-app subscriptions. The reasons, so the design
+organisation has switched on. Do not design a subscription per app. The reasons, so the design
 can lean on them:
 
-- Only Tournament carries real willingness to pay. Wishlist is a quiet companion and Casino is
-  play money with no organisation behind it. Per-app billing would ship one real product and
-  two dead ones.
-- Per-app billing multiplies every state we have to design and run: three checkouts, three
-  renewal dates, three invoices, three dunning paths, for a platform run by one person.
+- Per-app billing multiplies every state we have to design and run: a checkout, a renewal
+  date, an invoice and a dunning path for each app, on a platform run by one person.
 - The contract already works this way: one `plan` on the organisation, one limits lookup per
   owner, one billing page.
-- "One Planary subscription" is the same promise as "one Planary account". A new app later
-  joins the plan instead of asking for a new purchase decision.
+- "One Planary subscription" is the same promise as "one Planary account".
 
-Next to the subscription keep the **one-off Event pass**: it is already in the contract
-(`event_pass`), and it is the shape this market has settled on (Toornament sells a €19 Boost
-for a single tournament beside a monthly Community plan).
+**Planary will add other products that are meant to earn.** A single bundled plan would force
+a bad choice when that happens: give the new product to everyone on the plan, or raise the
+price for everyone. So the subscription is a **base plan plus add-ons**:
+
+- The **base plan** is the organisation's tier. It sets the limits that every Planary app
+  reads (teams, seats, lists, and whatever a later app counts).
+- A **paid product** that earns on its own attaches as an add-on line on the same
+  subscription: its own price, the same renewal date, the same invoice, the same billing
+  contact. Nothing about it is a second subscription.
+- A **one-off purchase** stays one-off and is named after the thing it unlocks. The tournament
+  pass is the first one.
+- Consumer money (Casino chips and cosmetics) is a different wallet and never enters the
+  organisation's subscription.
+
+The design must therefore show an invoice and a plan page that can hold **more than one line**
+from the start, even though today there is exactly one. Draw the add-on row now, with the
+tournament pass in it, so the layout does not have to be reopened later.
 
 ## 4. The plans to design
 
-Three choices on the page. Ids stay `gratis` / `event` / `verein` so nothing in the API moves.
+Tier names say **how much**, never **who you are** or **which app**. `Verein` names the
+audience and `Event` names the app; both go wrong the moment the family grows, which is the
+whole point of section 3.
 
-| | **Gratis** | **Event** | **Verein** |
+| | **Gratis** | **Plus** |
+|---|---|---|
+| Id | `gratis` | `plus` |
+| Price | CHF 0 | **CHF 149 a year**, one invoice |
+| For | Trying it out, something small and internal | An organisation that runs things all year |
+
+Beside them, not a tier:
+
+| | **Turnier-Pass** |
+|---|---|
+| Price | **CHF 29**, once, for one tournament |
+| For | One LAN, one night, once a year |
+
+`Pro` stays reserved and is not drawn. When a later product or a bigger audience needs a tier
+above Plus, it is added above, where it costs nothing to existing customers. Adding a cheaper
+tier below instead would undercut the only paid price we have.
+
+What each one allows:
+
+| | **Gratis** | **Turnier-Pass** | **Plus** |
 |---|---|---|---|
-| Price | CHF 0 | **CHF 29**, once, for one tournament | **CHF 149 a year**, one invoice |
-| For | Trying it out, a small internal tournament | One LAN, one night, once a year | A club that runs a season |
 | Teams | 16 | 128 | 128 |
 | Tournaments at once | 1 | the one it was bought for | unlimited |
 | Organiser seats | 2 | 10 | 10 |
@@ -90,22 +119,22 @@ Three choices on the page. Ids stay `gratis` / `event` / `verein` so nothing in 
 Why these numbers, so the page can be honest about them:
 
 - **CHF 29 for the pass.** The old 49 sat well above the market for the same thing. 29 is an
-  easy yes for one night, and the break-even against Verein lands at about five tournaments a
+  easy yes for one night, and the break-even against Plus lands at about five tournaments a
   year, which is exactly the line between the two audiences. Put that line on the page:
-  "Ab fünf Turnieren im Jahr lohnt sich Verein."
-- **CHF 149 a year, billed once.** Not "19 a month billed yearly". A Swiss Verein budgets and
-  approves yearly, pays one invoice, and files it. One price, one renewal, one invoice also
+  "Ab fünf Turnieren im Jahr lohnt sich Plus."
+- **CHF 149 a year, billed once.** Not "19 a month billed yearly". A Swiss organisation budgets
+  and approves yearly, pays one invoice, and files it. One price, one renewal, one invoice also
   removes proration and mid-term upgrades from the design. It undercuts the European
   competition (about €228 a year) for a club that counts every franc.
 - **No monthly option.** A club that runs a season does not need one, and monthly would double
   the billing states.
 - Anything bigger than a club (federations, schools with many organisers, a paid circuit) gets
-  a quiet line at the bottom of the page, not a fourth card: "Grössere Organisation? Schreib
+  a quiet line at the bottom of the page, not a third card: "Grössere Organisation? Schreib
   uns." It opens a support request with topic `plan`.
 - Check-in is in the free plan on purpose. Nothing that happens on the match day itself should
   be the thing that breaks.
 
-The **Platzhalter chip is gone**: these prices are real. Remove that treatment everywhere.
+The **Platzhalter chip is gone**: these prices are real.
 
 ## 5. Screens to design
 
@@ -118,15 +147,16 @@ Desktop light is the reference. Add dark and phone for the ones marked •.
 
 **Portal, plan and billing**
 - `PL-Plan-Gratis` • the plan page of a free organisation: what it has, what it is missing,
-  both upgrade paths side by side.
-- `PL-Plan-Verein` the same page once subscribed: plan, renewal date, payment method,
-  invoices, the quiet way out.
-- `PL-Plan-Event` an organisation whose pass covers one named tournament, and what happens to
-  that tournament's data when the pass is spent.
+  both ways up (pass and Plus) side by side.
+- `PL-Plan-Plus` the same page once subscribed: plan, renewal date, payment method, invoices,
+  the add-on line, the quiet way out.
+- `PL-Plan-Pass` an organisation on Gratis whose pass covers one named tournament, and what
+  happens to that tournament's data when the pass is spent.
 - `PL-Checkout` • choosing card or invoice, the price broken out, what is charged today.
-- `PL-Checkout-Event` the same with the tournament picker (the pass needs a `tournamentId`).
+- `PL-Checkout-Pass` the same with the tournament picker (the pass needs a `tournamentId`).
 - `PL-Done` the moment after paying: what is unlocked now, where to go next.
-- `PL-Invoices` the invoice list with `paid`, `open`, `overdue` rows, PDF and pay links.
+- `PL-Invoices` the invoice list with `paid`, `open`, `overdue` rows, PDF and pay links. One
+  invoice must be able to carry the plan and an add-on line.
 - `PL-Overdue` • the state the Console calls `overdue`: the banner, what still works, what
   stops, how to pay. Design this as calm, not punitive.
 - `PL-Card-Expires` the softer sibling: the card expires before the renewal.
@@ -157,14 +187,29 @@ lift it without losing what they were doing.
 |---|---|---|
 | 1 | A solo organiser has no organisation, but checkout is organisation-scoped. | Buying anything creates the organisation first, in one step inside checkout. Invoices and the billing contact need it. |
 | 2 | What happens to a finished tournament when its Event pass is spent. | It keeps everything it had, forever, read-only beyond the plan's limits. A pass is never retroactively removed. |
-| 3 | Does Verein renew automatically. | Yes, with a reminder 30 days ahead, and cancelling is one click in the portal, not an email to support. |
+| 3 | Does Plus renew automatically. | Yes, with a reminder 30 days ahead, and cancelling is one click in the portal, not an email to support. |
 | 4 | TWINT, which `PaymentMethod.kind` already allows. | Design the card and invoice paths. Leave room for a third button, do not draw it yet. |
 | 5 | Does the pass stack, two passes for two tournaments at once. | Yes, one pass per tournament, no limit on how many. |
 | 6 | Wishlist at 3 lists on the free plan. | Yes, but it is never mentioned on the pricing cards. It belongs in the comparison table only. |
+| 7 | Do the plan ids move now (`verein` → `plus`, `event` out of `PlanId`). | Yes, now, while almost nothing is sold. See section 8. |
 
 ## 8. What moves in code after the design lands
 
-Not part of the design, written down so it is not forgotten: `Plan.period` gains a `year`
-case and `month_yearly` goes away, `placeholder` drops out of the contract and the chip with
-it, the `PRICE` map in `src/app/customers/[id]/page.tsx`, the Console fixtures' `revenueYear`
-values (228 and 98 today) and `src/lib/org-fixtures.ts` all follow the new numbers.
+Not part of the design, written down so it is not forgotten.
+
+**The rename, worth doing before launch and painful after it.** In this repo the plan ids
+appear in five files only: `src/lib/org-contract.ts`, `src/lib/fmt.ts` (`PLAN_NAME`),
+`src/app/customers/page.tsx` (the filter), `src/app/customers/[id]/page.tsx` (`PRICE` and the
+plan select) and `src/lib/org-fixtures.ts`. The weight is on the other side: planary-org, the
+portal, and the values already stored on organisations.
+
+- `PlanId = 'gratis' | 'plus'`. `verein` becomes `plus`; `Pro` is reserved, not added.
+- `event` leaves `PlanId` entirely. A pass is not a tier an organisation sits on, it is an
+  entitlement on one tournament, which is what `LimitsResponse.source: 'event_pass'` already
+  says. `POST /portal/orgs/:id/checkout` splits accordingly: a plan body and a pass body.
+- The subscription gains add-on lines (section 3), so `Invoice` keeps its single amount but the
+  billing response needs the lines that make it up.
+- `Plan.period` gains a `year` case and `month_yearly` goes away. `placeholder` drops out of
+  the contract and the chip with it.
+- The `PRICE` map and the fixtures' `revenueYear` values (228 and 98 today) follow the new
+  numbers.
