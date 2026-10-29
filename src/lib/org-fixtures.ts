@@ -195,7 +195,7 @@ function customers(): CustomerRow[] {
     plan: c.plan.toLowerCase() as PlanId,
     members: n(c.mem),
     tournamentsThisYear: n(c.tour),
-    services: c.plan === "Verein" ? ["tournament", "wishlist"] : ["tournament"],
+    services: c.plan === "Plus" ? ["tournament", "wishlist"] : ["tournament"],
     revenueYear: n(c.rev) * 100,
     billing: c.st === "overdue" ? "overdue" : c.st === "free" ? "free" : c.st === "warn" ? "card_expires" : "paid",
     overdueDays: c.st === "overdue" ? 12 : 0,
@@ -223,7 +223,13 @@ function customer(id: string): CustomerDetail {
           amount: Math.round(n(i.a.replace("CHF", "")) * 100),
           currency: "CHF" as const,
           status: i.st === "err" ? ("open" as const) : ("paid" as const),
-          description: k === 0 ? "Plan Verein, 3.2.2026 bis 2.2.2027" : "Plan Event, Gurten LAN Warm-up",
+          description: k === 0 ? "Plus, 3.2.2026 bis 2.2.2027" : "Turnier-Pass, Gurten LAN Warm-up",
+          lines: [
+            k === 0
+              ? { kind: "base" as const, name: "Plus", period: "year" as const, amount: Math.round(n(i.a.replace("CHF", "")) * 100), tournamentId: null }
+              : { kind: "once" as const, name: "Turnier-Pass · Gurten LAN Warm-up", period: "once" as const, amount: Math.round(n(i.a.replace("CHF", "")) * 100), tournamentId: null },
+          ],
+          paidWith: i.st === "err" ? null : ("card" as const),
           overdueDays: i.st === "err" ? 12 : 0,
           pdfUrl: "#",
           payUrl: "#",
@@ -373,7 +379,7 @@ function detail(id: string): RequestDetail {
   const kind = { them: "customer", us: "staff", int: "internal" } as const;
   return {
     ...r,
-    plan: "verein",
+    plan: "plus",
     messages: (r?.code === "REQ-1184" ? F.thread : []).map((m, i) => ({
       id: `m${i}`,
       kind: kind[m.kind as keyof typeof kind],

@@ -120,5 +120,5 @@ export function shortName(name: string) {
   return rest.length ? `${first} ${rest[rest.length - 1][0]}.` : first;
 }
 
-export const PLAN_NAME = { gratis: "Gratis", event: "Event", verein: "Verein" } as const;
+export const PLAN_NAME = { gratis: "Gratis", plus: "Plus" } as const;
 export const ROLE_NAME = { owner: "Owner", manager: "Manager", support: "Support", viewer: "Viewer" } as const;

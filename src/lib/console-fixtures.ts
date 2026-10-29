@@ -672,7 +672,7 @@ export const CONSOLE_FIXTURES = {
       "who": "Lea Graf",
       "a": "Changed a plan",
       "tg": "Bümpliz Gaming",
-      "d": "Gratis → Event"
+      "d": "Gratis → Plus"
     },
     {
       "t": "20.10. 11:30",
@@ -739,10 +739,10 @@ export const CONSOLE_FIXTURES = {
       "n": "Verein Gurten LAN",
       "ini": "GL",
       "lc": "",
-      "plan": "Verein",
+      "plan": "Plus",
       "mem": "3",
       "tour": "7",
-      "rev": "228",
+      "rev": "149",
       "st": "overdue",
       "stl": "Overdue 12 days",
       "since": "03.02.2026"
@@ -752,10 +752,10 @@ export const CONSOLE_FIXTURES = {
       "n": "FC Länggasse Esports",
       "ini": "FL",
       "lc": "l2",
-      "plan": "Verein",
+      "plan": "Plus",
       "mem": "5",
       "tour": "11",
-      "rev": "228",
+      "rev": "149",
       "st": "ok",
       "stl": "Paid",
       "since": "12.01.2026"
@@ -765,10 +765,10 @@ export const CONSOLE_FIXTURES = {
       "n": "Schule Kirchenfeld",
       "ini": "SK",
       "lc": "l3",
-      "plan": "Event",
+      "plan": "Gratis",
       "mem": "2",
       "tour": "2",
-      "rev": "98",
+      "rev": "58",
       "st": "ok",
       "stl": "Paid",
       "since": "28.08.2026"
@@ -778,10 +778,10 @@ export const CONSOLE_FIXTURES = {
       "n": "Aare Esports Club",
       "ini": "AE",
       "lc": "",
-      "plan": "Verein",
+      "plan": "Plus",
       "mem": "4",
       "tour": "9",
-      "rev": "228",
+      "rev": "149",
       "st": "ok",
       "stl": "Paid",
       "since": "05.03.2026"
@@ -791,10 +791,10 @@ export const CONSOLE_FIXTURES = {
       "n": "Bümpliz Gaming",
       "ini": "BG",
       "lc": "l2",
-      "plan": "Event",
+      "plan": "Gratis",
       "mem": "1",
       "tour": "1",
-      "rev": "49",
+      "rev": "29",
       "st": "ok",
       "stl": "Paid",
       "since": "30.09.2026"
@@ -830,10 +830,10 @@ export const CONSOLE_FIXTURES = {
       "n": "Uni Bern Gaming",
       "ini": "UB",
       "lc": "l2",
-      "plan": "Verein",
+      "plan": "Plus",
       "mem": "6",
       "tour": "5",
-      "rev": "228",
+      "rev": "149",
       "st": "warn",
       "stl": "Card expires 11/26",
       "since": "21.04.2026"
@@ -845,7 +845,7 @@ export const CONSOLE_FIXTURES = {
       "org": "Verein Gurten LAN",
       "g": "Counter-Strike 2",
       "teams": "16 / 16",
-      "plan": "Verein",
+      "plan": "Plus",
       "st": "live",
       "d": "Today"
     },
@@ -854,7 +854,7 @@ export const CONSOLE_FIXTURES = {
       "org": "FC Länggasse Esports",
       "g": "Valorant",
       "teams": "24 / 32",
-      "plan": "Verein",
+      "plan": "Plus",
       "st": "live",
       "d": "Today"
     },
@@ -863,7 +863,7 @@ export const CONSOLE_FIXTURES = {
       "org": "Schule Kirchenfeld",
       "g": "Rocket League",
       "teams": "12 / 16",
-      "plan": "Event",
+      "plan": "Gratis",
       "st": "live",
       "d": "Today"
     },
@@ -872,7 +872,7 @@ export const CONSOLE_FIXTURES = {
       "org": "Aare Esports Club",
       "g": "League of Legends",
       "teams": "18 / 32",
-      "plan": "Verein",
+      "plan": "Plus",
       "st": "open",
       "d": "31.10."
     },
@@ -881,7 +881,7 @@ export const CONSOLE_FIXTURES = {
       "org": "Verein Gurten LAN",
       "g": "Counter-Strike 2",
       "teams": "4 / 32",
-      "plan": "Verein",
+      "plan": "Plus",
       "st": "open",
       "d": "13.12."
     },
@@ -908,7 +908,7 @@ export const CONSOLE_FIXTURES = {
       "org": "Verein Gurten LAN",
       "g": "Counter-Strike 2",
       "teams": "16 / 16",
-      "plan": "Event",
+      "plan": "Gratis",
       "st": "done",
       "d": "09.08."
     }
@@ -948,7 +948,7 @@ export const CONSOLE_FIXTURES = {
       "n": "Verein Gurten LAN",
       "ini": "GL",
       "lc": "",
-      "plan": "Verein",
+      "plan": "Plus",
       "orgs": "3",
       "tour": "7",
       "last": "Gurten LAN · today",
@@ -959,7 +959,7 @@ export const CONSOLE_FIXTURES = {
       "n": "FC Länggasse Esports",
       "ini": "FL",
       "lc": "l2",
-      "plan": "Verein",
+      "plan": "Plus",
       "orgs": "5",
       "tour": "11",
       "last": "Herbstcup Valorant · today",
@@ -970,7 +970,7 @@ export const CONSOLE_FIXTURES = {
       "n": "Aare Esports Club",
       "ini": "AE",
       "lc": "",
-      "plan": "Verein",
+      "plan": "Plus",
       "orgs": "4",
       "tour": "9",
       "last": "Aare Open · 31.10.",
@@ -981,7 +981,7 @@ export const CONSOLE_FIXTURES = {
       "n": "Schule Kirchenfeld",
       "ini": "SK",
       "lc": "l3",
-      "plan": "Event",
+      "plan": "Gratis",
       "orgs": "2",
       "tour": "2",
       "last": "Pausenplatz-Turnier · today",
@@ -1188,8 +1188,8 @@ export const CONSOLE_FIXTURES = {
     "ini": "GL",
     "id": "org_8f2k1",
     "since": "03.02.2026",
-    "plan": "Verein",
-    "price": "CHF 19 / month, billed yearly",
+    "plan": "Plus",
+    "price": "CHF 149 a year, one invoice",
     "renews": "03.02.2027",
     "pay": "Visa •••• 4242, expires 08/28",
     "prov": "Stripe",
@@ -1198,14 +1198,14 @@ export const CONSOLE_FIXTURES = {
       {
         "n": "2026-0142",
         "d": "24.09.2026",
-        "a": "CHF 228.00",
+        "a": "CHF 149.00",
         "st": "err",
         "stl": "Overdue 12 days"
       },
       {
         "n": "2026-0031",
         "d": "03.02.2026",
-        "a": "CHF 49.00",
+        "a": "CHF 29.00",
         "st": "ok",
         "stl": "Paid"
       }
@@ -1254,7 +1254,7 @@ export const CONSOLE_FIXTURES = {
       {
         "who": "Lea Graf",
         "t": "20.10. 19:41",
-        "b": "Moved from Event to Verein in September, they run about one tournament a month. Invoice 2026-0142 is overdue; Matteo says the club treasurer pays on the 25th. Keep the plan until 03.11."
+        "b": "Moved from Gratis with passes to Plus in September, they run about one tournament a month. Invoice 2026-0142 is overdue; Matteo says the club treasurer pays on the 25th. Keep the plan until 03.11."
       },
       {
         "who": "Sven Huber",
