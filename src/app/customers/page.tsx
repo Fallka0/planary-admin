@@ -25,8 +25,7 @@ function Customers() {
   const rows = all.filter((c) => filter === "all" || (filter === "overdue" ? c.billing === "overdue" : c.plan === filter));
   const chips: [Filter, string][] = [
     ["all", "All"],
-    ["verein", "Verein"],
-    ["event", "Event"],
+    ["plus", "Plus"],
     ["gratis", "Gratis"],
     ["overdue", "Overdue"],
   ];
