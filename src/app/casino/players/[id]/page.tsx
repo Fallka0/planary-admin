@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { use, useState } from "react";
 import { Alert, Button, Card, Chip, Description, Input, Label, Link as HeroLink, Separator, Skeleton, Table, Tabs, TextArea, TextField, toast } from "@heroui/react";
-import { ArrowLeft, Copy } from "lucide-react";
+import { ArrowLeft, Ban, Copy } from "lucide-react";
 import { useStaff } from "@/components/CasinoStaff";
 import { ActionModal, Avatar, Empty, Loading, Segmented, StatusChip, useRun } from "@/components/ui";
 import { ProgressPanel, ResetDialog } from "./progress";
@@ -21,7 +21,8 @@ interface Detail extends Badge {
   lastSeen: number | null;
   status: string;
   blockedReason: string | null;
-  account: { status: string; until: number | null; reason: string | null };
+  /** bannedEverywhereAt: when the whole Planary account was banned (missing while the casino API runs an older version). */
+  account: { status: string; until: number | null; reason: string | null; bannedEverywhereAt?: number | null };
   mutedUntil: number | null;
   limits: { lossLimit: number | null; excludedUntil: number | null; lossToday: number };
   lifetime: Record<string, number>;
@@ -34,7 +35,7 @@ interface Detail extends Badge {
   audit: { id: number; staff_name: string; action: string; details: string; created_at: number }[];
 }
 
-type Sheet = "adjust" | "status" | "mute" | "limits" | "reset" | "name" | "password" | null;
+type Sheet = "adjust" | "status" | "mute" | "limits" | "reset" | "name" | "password" | "ban" | null;
 
 const DAY = 86_400_000;
 
@@ -337,6 +338,101 @@ function PasswordDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
   );
 }
 
+type VaultResult = "deleted" | "not_configured" | "failed";
+
+const VAULT_NOTE: Record<Exclude<VaultResult, "deleted">, string> = {
+  not_configured: "The account is banned, but the Vault wasn't deleted: planary-auth isn't connected to Planary Vault yet. Ban again once it is.",
+  failed: "The account is banned, but deleting the Vault didn't go through. Try again; nothing else is repeated.",
+};
+
+/** What the last ban did to the Vault, from the audit trail. */
+function banVault(p: Detail): VaultResult | null {
+  const row = p.audit.find((a) => a.action === "account.ban_everywhere");
+  if (!row) return null;
+  try {
+    return (JSON.parse(row.details) as { vault?: VaultResult }).vault ?? null;
+  } catch {
+    return null;
+  }
+}
+
+function BanDialog({ p, onClose }: { p: Detail; onClose: () => void }) {
+  const act = useAdminAction();
+  const again = Boolean(p.account.bannedEverywhereAt);
+  const [reason, setReason] = useState(again ? (p.account.reason ?? "") : "");
+  const [confirm, setConfirm] = useState("");
+  const [vault, setVault] = useState<Exclude<VaultResult, "deleted"> | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const ready = reason.trim().length >= 3 && confirm.trim().toLowerCase() === p.name.toLowerCase();
+
+  async function ban() {
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await act<{ vault: VaultResult }>(`/players/${p.id}/ban`, { reason });
+      if (res.vault === "deleted") {
+        toast("Account banned and Vault deleted", { variant: "success" });
+        onClose();
+      } else setVault(res.vault);
+    } catch (e) {
+      setError(e instanceof ApiError ? e.message : "That didn't work.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <ActionModal
+      title={again ? "Retry Vault deletion" : "Ban account"}
+      onClose={onClose}
+      error={error}
+      action={
+        vault ? (
+          <Button onPress={onClose}>Done</Button>
+        ) : (
+          <Button variant="danger" isPending={busy} isDisabled={!ready} onPress={() => void ban()}>
+            <Ban className="size-4" /> {again ? "Delete Vault data" : "Ban everywhere"}
+          </Button>
+        )
+      }
+    >
+      {vault ? (
+        <Alert status="warning">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>{VAULT_NOTE[vault]}</Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : (
+        <>
+          <Alert status="danger">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Title>This cannot be undone</Alert.Title>
+              <Alert.Description>
+                {again
+                  ? `${p.name}'s Planary account is already banned. This only tries again to permanently delete their Planary Vault data.`
+                  : `Bans ${p.name}'s whole Planary account, not just the casino: they're signed out of every Planary app within a minute and can't sign in or sign up with this email again. All of their Planary Vault data (every file, version and share) is permanently deleted.`}
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
+          {again ? null : <p className="text-default-500 text-sm">Their casino account is closed for good too. Chips and history stay in the records.</p>}
+          <TextField value={reason} onChange={setReason} maxLength={200}>
+            <Label>Reason</Label>
+            <Input placeholder="e.g. Fraud with several accounts" />
+            <Description>Kept in the audit log.</Description>
+          </TextField>
+          <TextField value={confirm} onChange={setConfirm}>
+            <Label>Type {p.name} to confirm</Label>
+            <Input placeholder={p.name} autoComplete="off" />
+          </TextField>
+        </>
+      )}
+    </ActionModal>
+  );
+}
+
 function Stat({ rows }: { rows: [string, React.ReactNode][] }) {
   return (
     <dl className="divide-default-200 divide-y">
@@ -479,6 +575,7 @@ const ACTION_LABEL: Record<string, string> = {
   "account.active": "reactivated the account",
   "account.suspended": "suspended the account",
   "account.banned": "closed the account",
+  "account.ban_everywhere": "banned the Planary account",
   "chat.mute": "muted chat",
   "chat.unmute": "lifted the chat mute",
   "limits.set": "set limits",
@@ -520,6 +617,8 @@ export default function PlayerPage({ params }: PageProps<"/casino/players/[id]">
   if (!p) return <Skeleton className="h-96 rounded-xl" />;
 
   const s = p.stats;
+  const bannedEverywhere = p.account.bannedEverywhereAt ?? null;
+  const vaultLeft = Boolean(bannedEverywhere) && banVault(p) !== "deleted";
   const where = p.presence.online
     ? p.presence.where === "lobby"
       ? "In the lobby"
@@ -543,7 +642,7 @@ export default function PlayerPage({ params }: PageProps<"/casino/players/[id]">
           <div className="min-w-[14rem] flex-1 grid gap-1.5">
             <h2 className="text-2xl font-bold tracking-tight">{p.name}</h2>
             <div className="flex flex-wrap items-center gap-1.5">
-              <StatusChip status={p.status} />
+              {bannedEverywhere ? <Chip color="danger">Banned everywhere</Chip> : <StatusChip status={p.status} />}
               {p.mutedUntil ? <StatusChip status="muted" /> : null}
               <Chip color={p.presence.online ? "success" : "default"}>{where}</Chip>
               {p.title ? <Chip>{p.title}</Chip> : null}
@@ -564,7 +663,19 @@ export default function PlayerPage({ params }: PageProps<"/casino/players/[id]">
         </Card.Content>
       </Card>
 
-      {p.blockedReason ? (
+      {bannedEverywhere ? (
+        <Alert status="danger">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Title>Planary account banned since {dateTime(bannedEverywhere)}</Alert.Title>
+            <Alert.Description>
+              They can&apos;t sign in to any Planary app.{" "}
+              {vaultLeft ? "Their Planary Vault data hasn't been deleted yet: retry below." : "Their Planary Vault data was deleted."}
+              {p.account.reason ? ` Reason: ${p.account.reason}` : ""}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : p.blockedReason ? (
         <Alert status="warning">
           <Alert.Indicator />
           <Alert.Content>
@@ -577,9 +688,11 @@ export default function PlayerPage({ params }: PageProps<"/casino/players/[id]">
         {staff.can("chips") ? <Button onPress={() => setModal("adjust")}>Adjust chips</Button> : null}
         {staff.can("restrict") ? (
           <>
-            <Button variant="secondary" onPress={() => setModal("status")}>
-              Account status
-            </Button>
+            {bannedEverywhere ? null : (
+              <Button variant="secondary" onPress={() => setModal("status")}>
+                Account status
+              </Button>
+            )}
             <Button variant="secondary" onPress={() => setModal("limits")}>
               Responsible play
             </Button>
@@ -611,6 +724,11 @@ export default function PlayerPage({ params }: PageProps<"/casino/players/[id]">
         {staff.can("reset") ? (
           <Button variant="danger" onPress={() => setModal("reset")}>
             Reset account
+          </Button>
+        ) : null}
+        {staff.can("ban") && (!bannedEverywhere || vaultLeft) ? (
+          <Button variant={bannedEverywhere ? "danger-soft" : "danger"} onPress={() => setModal("ban")}>
+            <Ban className="size-4" /> {bannedEverywhere ? "Retry Vault deletion" : "Ban account"}
           </Button>
         ) : null}
         <HeroLink href={`https://casino.planary.ch/u/${p.id}`} target="_blank" rel="noreferrer" className="text-default-600 ml-auto self-center text-sm">
@@ -751,6 +869,7 @@ export default function PlayerPage({ params }: PageProps<"/casino/players/[id]">
       {modal === "reset" ? <ResetDialog playerId={p.id} name={p.name} onClose={() => setModal(null)} /> : null}
       {modal === "name" ? <NameDialog p={p} onClose={() => setModal(null)} /> : null}
       {modal === "password" ? <PasswordDialog p={p} onClose={() => setModal(null)} /> : null}
+      {modal === "ban" ? <BanDialog p={p} onClose={() => setModal(null)} /> : null}
     </>
   );
 }

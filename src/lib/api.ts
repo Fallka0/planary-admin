@@ -87,7 +87,7 @@ export function avatarSrc(path: string | null) {
 // ── Types ────────────────────────────────────────────
 
 export type Role = "owner" | "manager" | "support" | "viewer";
-export type Permission = "view" | "note" | "moderate" | "restrict" | "chips" | "games" | "economy" | "announce" | "audit" | "staff" | "reset";
+export type Permission = "view" | "note" | "moderate" | "restrict" | "chips" | "games" | "economy" | "announce" | "audit" | "staff" | "reset" | "ban";
 
 export interface StaffMe {
   id: string;
