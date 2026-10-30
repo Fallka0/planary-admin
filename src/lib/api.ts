@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useAuth } from "@/components/AuthProvider";
+import { casinoFixture } from "./casino-fixtures";
 
 export const CASINO_API = process.env.NEXT_PUBLIC_CASINO_API || "https://planary-casino-api.planary.workers.dev";
 
@@ -16,6 +17,13 @@ export class ApiError extends Error {
 }
 
 export async function adminCall<T>(token: string, path: string, body?: unknown): Promise<T> {
+  if (process.env.NEXT_PUBLIC_CONSOLE_DATA === "fixtures") {
+    try {
+      return casinoFixture(path) as T;
+    } catch (e) {
+      throw new ApiError((e as Error).message, 404);
+    }
+  }
   const res = await fetch(`${CASINO_API}/admin${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers: { Authorization: `Bearer ${token}`, ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
@@ -164,6 +172,8 @@ export interface AchievementRow {
   secret: boolean;
   progress: { stat: string; target: number } | null;
   unlockedAt: number | null;
+  /** Unlocked, with its chips and cosmetic still waiting for the player to claim. */
+  unclaimed: boolean;
   /** Cosmetics this one hands out when it unlocks. */
   rewards: { id: string; name: string; kind: string }[];
 }

@@ -1,259 +1,277 @@
 "use client";
 
 import { useState } from "react";
-import { Alert, Button, Card, Description, Label, ListBox, Modal, Radio, RadioGroup, SearchField, Select, Skeleton, Table, toast } from "@heroui/react";
-import { useStaff } from "@/components/Shell";
-import { Avatar, StatusChip, Who } from "@/components/ui";
-import { ApiError, type Badge, type Role, useAdmin, useAdminAction } from "@/lib/api";
-import { date } from "@/lib/format";
+import { useAuth } from "@/components/AuthProvider";
+import { Gate, useBusy, useConsole } from "@/components/console/Shell";
+import { useAct } from "@/components/console/useAct";
+import { Dialog, ErrorCard, Ic, PageHead, Sk, Table, Td } from "@/components/console/ui";
+import { CONSOLE } from "@/design/console-copy";
+import type { IconName } from "@/design/icons";
+import { ApiError, adminCall } from "@/lib/api";
+import { ago, initials, ROLE_NAME } from "@/lib/fmt";
+import { FIXTURES, now, useOrg } from "@/lib/org";
+import type { StaffRole, StaffRow } from "@/lib/org-contract";
 
-interface Member extends Badge {
-  email: string;
-  role: Role;
-  since: number;
+const ROLES: StaffRole[] = ["owner", "manager", "support", "viewer"];
+const CAP: Record<string, { icon: IconName; cls: string; text: string }> = {
+  Edit: { icon: "check", cls: "", text: "Edit" },
+  Read: { icon: "eye", cls: "", text: "Read" },
+  No: { icon: "x", cls: "no", text: "No access" },
+};
+
+/**
+ * The Casino keeps its own staff list for its /admin routes. Mirror the role there so one
+ * screen manages one role per person. Answers a sentence when the Casino couldn't take it.
+ */
+async function mirrorToCasino(token: string, userId: string, role: StaffRole | null): Promise<string | null> {
+  if (FIXTURES) return null;
+  try {
+    if (role) await adminCall(token, "/staff", { userId, role });
+    else await adminCall(token, `/staff/${userId}/remove`, {});
+    return null;
+  } catch (e) {
+    if (!role && e instanceof ApiError && e.status === 404) return null; // wasn't Casino staff
+    if (e instanceof ApiError && e.status === 404) return "The Casino role wasn’t set: they need to open the casino once first.";
+    return `The Casino didn’t take the change: ${e instanceof Error ? e.message : "unknown error"}`;
+  }
 }
 
-const ROLES: { role: Role; label: string; can: string }[] = [
-  { role: "owner", label: "Owner", can: "Everything, including staff, account resets and handing out progress." },
-  { role: "manager", label: "Manager", can: "Players, chips, restrictions, games, economy, announcements, audit log." },
-  { role: "support", label: "Support", can: "Look up players, notes, mutes and moderation. No chip changes." },
-  { role: "viewer", label: "Viewer", can: "Read-only: figures, players and transactions." },
-];
-
 function AddDialog({ onClose }: { onClose: () => void }) {
-  const act = useAdminAction();
-  const [q, setQ] = useState("");
-  const [picked, setPicked] = useState<Badge | null>(null);
-  const [role, setRole] = useState<Role>("support");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
-  const { data } = useAdmin<{ players: Badge[] }>(q.trim().length >= 2 && !picked ? `/players?q=${encodeURIComponent(q.trim())}` : null);
+  const { run, busy, error } = useAct();
+  const [email, setEmail] = useState("");
+  const [role, setRole] = useState<StaffRole>("support");
+  const valid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim());
+  return (
+    <Dialog
+      title="Add staff"
+      onClose={onClose}
+      actions={
+        <>
+          <button className="btn btn-line btn-s" type="button" onClick={onClose}>
+            Cancel
+          </button>
+          <button
+            className="btn btn-ink btn-s"
+            type="button"
+            disabled={!valid || busy}
+            onClick={async () => {
+              if (await run("/console/staff", { email: email.trim().toLowerCase(), role }, `${email.trim()} added as ${ROLE_NAME[role]}`)) onClose();
+            }}
+          >
+            Add
+          </button>
+        </>
+      }
+    >
+      <div className="f">
+        <label className="f-l" htmlFor="as-e">
+          Planary account email
+        </label>
+        <input id="as-e" className="inp" type="email" value={email} onChange={(e) => setEmail(e.target.value)} autoComplete="off" />
+        <span className="f-h">They get access the next time they sign in to the Console with this account.</span>
+      </div>
+      <div className="f">
+        <label className="f-l" htmlFor="as-r">
+          Role
+        </label>
+        <select id="as-r" className="sel" value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
+          {ROLES.map((r) => (
+            <option key={r} value={r}>
+              {ROLE_NAME[r]}
+            </option>
+          ))}
+        </select>
+      </div>
+      {error ? <p className="f-err">{error}</p> : null}
+    </Dialog>
+  );
+}
 
-  async function add() {
-    if (!picked) return;
-    setBusy(true);
-    setError(null);
-    try {
-      await act("/staff", { userId: picked.id, role });
-      toast(`${picked.name} added as ${role}`, { variant: "success" });
-      onClose();
-    } catch (e) {
-      setError(e instanceof ApiError ? e.message : "That didn't work.");
-      setBusy(false);
-    }
-  }
+function RoleDialog({ person, onClose, notify }: { person: StaffRow; onClose: () => void; notify: (t: string, tone?: "err") => void }) {
+  const { accessToken } = useAuth();
+  const { me } = useConsole();
+  const { run, busy, error } = useAct();
+  const [role, setRole] = useState<StaffRole>(person.role);
+  const [removing, setRemoving] = useState(false);
+  const self = person.id === me.id;
+  return (
+    <Dialog
+      title={removing ? `Remove ${person.name}?` : `Role of ${person.name}`}
+      onClose={onClose}
+      actions={
+        removing ? (
+          <>
+            <button className="btn btn-line btn-s" type="button" onClick={() => setRemoving(false)}>
+              Keep
+            </button>
+            <button
+              className="btn btn-danger btn-s"
+              type="button"
+              disabled={busy}
+              onClick={async () => {
+                if (!(await run(`/console/staff/${person.id}/remove`, {}, `${person.name} removed`))) return;
+                const casino = await mirrorToCasino(accessToken, person.id, null);
+                if (casino) notify(casino, "err");
+                onClose();
+              }}
+            >
+              Remove from staff
+            </button>
+          </>
+        ) : (
+          <>
+            {!self ? (
+              <button className="btn btn-ghost btn-s" type="button" style={{ marginRight: "auto" }} onClick={() => setRemoving(true)}>
+                Remove from staff
+              </button>
+            ) : null}
+            <button className="btn btn-line btn-s" type="button" onClick={onClose}>
+              Cancel
+            </button>
+            <button
+              className="btn btn-ink btn-s"
+              type="button"
+              disabled={busy || role === person.role}
+              onClick={async () => {
+                if (!(await run(`/console/staff/${person.id}`, { role }, `${person.name} is now ${ROLE_NAME[role]}`))) return;
+                const casino = await mirrorToCasino(accessToken, person.id, role);
+                if (casino) notify(casino, "err");
+                onClose();
+              }}
+            >
+              Save
+            </button>
+          </>
+        )
+      }
+    >
+      {removing ? (
+        <p>They lose access to the Console and the Casino admin. Their entries in the audit log stay.</p>
+      ) : (
+        <div className="f">
+          <label className="f-l" htmlFor="rd-r">
+            Role
+          </label>
+          <select id="rd-r" className="sel" value={role} onChange={(e) => setRole(e.target.value as StaffRole)}>
+            {ROLES.map((r) => (
+              <option key={r} value={r}>
+                {ROLE_NAME[r]}
+              </option>
+            ))}
+          </select>
+          <span className="f-h">The table below says what each role can do. The Casino gets the same role.</span>
+        </div>
+      )}
+      {error ? <p className="f-err">{error}</p> : null}
+    </Dialog>
+  );
+}
+
+function StaffPageInner() {
+  const { can } = useConsole();
+  const { data, error, loading, reload } = useOrg<{ staff: StaffRow[] }>("/console/staff");
+  const { toast, notify } = useAct();
+  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<StaffRow | null>(null);
+  useBusy(loading);
+  const edit = can("staff", "edit");
+  const t = now();
 
   return (
-    <Modal.Backdrop isOpen onOpenChange={(open: boolean) => !open && onClose()}>
-      <Modal.Container>
-        <Modal.Dialog className="sm:max-w-[460px]">
-          <Modal.CloseTrigger />
-          <Modal.Header>
-            <Modal.Heading>Add staff</Modal.Heading>
-          </Modal.Header>
-          <Modal.Body className="grid gap-4">
-            <p className="text-default-500 text-sm">
-              Staff sign in to admin.planary.ch with their own Planary account. They need to have opened the casino once.
-            </p>
-            {picked ? (
-              <div className="flex items-center justify-between gap-3">
-                <Who player={picked} sub={picked.id} />
-                <Button size="sm" variant="secondary" onPress={() => setPicked(null)}>
-                  Change
-                </Button>
-              </div>
-            ) : (
-              <>
-                <SearchField value={q} onChange={setQ}>
-                  <Label>Player</Label>
-                  <SearchField.Group>
-                    <SearchField.SearchIcon />
-                    <SearchField.Input placeholder="Search by name" />
-                    <SearchField.ClearButton />
-                  </SearchField.Group>
-                </SearchField>
-                {data?.players.length ? (
-                  <ul className="grid gap-0.5">
-                    {data.players.slice(0, 6).map((p) => (
-                      <li key={p.id}>
-                        <button className="hover:bg-default-100 flex w-full items-center gap-2 rounded-lg p-2 text-left" onClick={() => setPicked(p)}>
-                          <Avatar player={p} size="sm" /> {p.name}
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                ) : null}
-              </>
-            )}
-
-            <RadioGroup value={role} variant="secondary" onChange={(value: string) => setRole(value as Role)}>
-              <Label>Role</Label>
-              {ROLES.map((r) => (
-                <Radio key={r.role} value={r.role}>
-                  <Radio.Content>
-                    <Radio.Control>
-                      <Radio.Indicator />
-                    </Radio.Control>
-                    {r.label}
-                  </Radio.Content>
-                  <Description>{r.can}</Description>
-                </Radio>
+    <>
+      <PageHead title={CONSOLE.pages.staff.title}>
+        {edit ? (
+          <button className="btn btn-ink btn-s" type="button" onClick={() => setAdding(true)}>
+            <Ic name="plus" small />
+            Add staff
+          </button>
+        ) : null}
+      </PageHead>
+      {error && !data ? (
+        <ErrorCard title="Staff didn’t load" error={error} onRetry={reload} />
+      ) : (
+        <section className="box" aria-labelledby="st-h">
+          <div className="box-h">
+            <h2 id="st-h" className="box-t">
+              Staff
+            </h2>
+            <span className="box-s">{data ? `${data.staff.length} ${data.staff.length === 1 ? "person" : "people"}` : ""}</span>
+          </div>
+          {!data ? (
+            <Sk h={200} r={12} />
+          ) : (
+            <Table
+              cols="minmax(0,1.4fr) minmax(0,1.4fr) 110px 110px 44px"
+              colsS="minmax(0,1fr) auto 44px"
+              head={[{ h: "Name" }, { h: "Email", hide: true }, { h: "Role" }, { h: "Last active", hide: true }, { h: "" }]}
+            >
+              {data.staff.map((s) => (
+                <tr className="dt-r" key={s.id}>
+                  <Td>
+                    <span className="who">
+                      <span className="av">{initials(s.name)}</span>
+                      <b>{s.name}</b>
+                    </span>
+                  </Td>
+                  <Td hide>{s.email}</Td>
+                  <Td>
+                    <span className="cx">{ROLE_NAME[s.role]}</span>
+                  </Td>
+                  <Td hide>{s.lastActive ? ago(s.lastActive, t) : "invited"}</Td>
+                  <Td r>
+                    {edit ? (
+                      <button className="ib" type="button" aria-label={`Change role of ${s.name}`} onClick={() => setEditing(s)}>
+                        <Ic name="more" small />
+                      </button>
+                    ) : null}
+                  </Td>
+                </tr>
               ))}
-            </RadioGroup>
+            </Table>
+          )}
+        </section>
+      )}
 
-            {error ? (
-              <Alert status="danger">
-                <Alert.Indicator />
-                <Alert.Content>
-                  <Alert.Description>{error}</Alert.Description>
-                </Alert.Content>
-              </Alert>
-            ) : null}
-          </Modal.Body>
-          <Modal.Footer>
-            <Button variant="tertiary" onPress={onClose}>
-              Cancel
-            </Button>
-            <Button isDisabled={!picked} isPending={busy} onPress={() => void add()}>
-              Add
-            </Button>
-          </Modal.Footer>
-        </Modal.Dialog>
-      </Modal.Container>
-    </Modal.Backdrop>
+      <section className="box sec" aria-labelledby="mx-h">
+        <div className="box-h">
+          <h2 id="mx-h" className="box-t">
+            What each role can do
+          </h2>
+        </div>
+        <Table
+          className="matrix"
+          cols="minmax(0,1.8fr) repeat(4,minmax(0,1fr))"
+          colsS="minmax(0,1.4fr) repeat(4,minmax(0,1fr))"
+          head={[{ h: "Area" }, { h: "Owner" }, { h: "Manager" }, { h: "Support" }, { h: "Viewer" }]}
+        >
+          {CONSOLE.matrix.map(([areaName, ...cells]) => (
+            <tr className="dt-r" key={areaName}>
+              <Td>
+                <b>{areaName}</b>
+              </Td>
+              {cells.map((c, i) => (
+                <Td key={i}>
+                  <span className={`cap ${CAP[c].cls}`.trim()}>
+                    <Ic name={CAP[c].icon} small />
+                    <span className="cap-t">{CAP[c].text}</span>
+                  </span>
+                </Td>
+              ))}
+            </tr>
+          ))}
+        </Table>
+      </section>
+      {adding ? <AddDialog onClose={() => setAdding(false)} /> : null}
+      {editing ? <RoleDialog person={editing} onClose={() => setEditing(null)} notify={notify} /> : null}
+      {toast}
+    </>
   );
 }
 
 export default function StaffPage() {
-  const me = useStaff();
-  const act = useAdminAction();
-  const { data } = useAdmin<{ staff: Member[] }>("/staff");
-  const [adding, setAdding] = useState(false);
-  const [removing, setRemoving] = useState<Member | null>(null);
-
-  const change = (id: string, role: string) =>
-    act("/staff", { userId: id, role }).then(
-      () => toast("Role changed", { variant: "success" }),
-      (e) => toast(e.message, { variant: "danger" }),
-    );
-
   return (
-    <>
-      <header className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <h1 className="text-2xl font-bold tracking-tight">Staff</h1>
-          <p className="text-default-500">Who can use this console, and what each role allows.</p>
-        </div>
-        {me.can("staff") ? <Button onPress={() => setAdding(true)}>Add staff</Button> : null}
-      </header>
-
-      {!data ? (
-        <Skeleton className="h-64 rounded-xl" />
-      ) : (
-        <Table>
-          <Table.ScrollContainer>
-            <Table.Content aria-label="Staff" className="min-w-[640px]">
-              <Table.Header>
-                <Table.Column isRowHeader>Person</Table.Column>
-                <Table.Column>Role</Table.Column>
-                <Table.Column>Since</Table.Column>
-                <Table.Column>{""}</Table.Column>
-              </Table.Header>
-              <Table.Body>
-                {data.staff.map((m) => (
-                  <Table.Row key={m.id}>
-                    <Table.Cell>
-                      <Who player={m} sub={m.email || "Hasn't signed in yet"} />
-                    </Table.Cell>
-                    <Table.Cell>
-                      {me.can("staff") && m.id !== me.id ? (
-                        <Select className="w-36" value={m.role} onChange={(value) => void change(m.id, String(value))}>
-                          <Label className="sr-only">Role of {m.name}</Label>
-                          <Select.Trigger>
-                            <Select.Value />
-                            <Select.Indicator />
-                          </Select.Trigger>
-                          <Select.Popover>
-                            <ListBox>
-                              {ROLES.map((r) => (
-                                <ListBox.Item key={r.role} id={r.role} textValue={r.label}>
-                                  {r.label}
-                                  <ListBox.ItemIndicator />
-                                </ListBox.Item>
-                              ))}
-                            </ListBox>
-                          </Select.Popover>
-                        </Select>
-                      ) : (
-                        <StatusChip status={m.role} />
-                      )}
-                    </Table.Cell>
-                    <Table.Cell className="text-default-500">{date(m.since)}</Table.Cell>
-                    <Table.Cell>
-                      {me.can("staff") && m.id !== me.id ? (
-                        <Button size="sm" variant="danger-soft" onPress={() => setRemoving(m)}>
-                          Remove
-                        </Button>
-                      ) : m.id === me.id ? (
-                        <span className="text-default-500 text-sm">You</span>
-                      ) : null}
-                    </Table.Cell>
-                  </Table.Row>
-                ))}
-              </Table.Body>
-            </Table.Content>
-          </Table.ScrollContainer>
-        </Table>
-      )}
-
-      <Card>
-        <Card.Header>
-          <Card.Title>Roles</Card.Title>
-        </Card.Header>
-        <Card.Content>
-          <ul className="divide-default-200 divide-y">
-            {ROLES.map((r) => (
-              <li key={r.role} className="flex items-center gap-3 py-2.5">
-                <StatusChip status={r.role} />
-                <span className="text-default-600">{r.can}</span>
-              </li>
-            ))}
-          </ul>
-        </Card.Content>
-      </Card>
-
-      {adding ? <AddDialog onClose={() => setAdding(false)} /> : null}
-      {removing ? (
-        <Modal.Backdrop isOpen onOpenChange={(open: boolean) => !open && setRemoving(null)}>
-          <Modal.Container>
-            <Modal.Dialog className="sm:max-w-[400px]">
-              <Modal.CloseTrigger />
-              <Modal.Header>
-                <Modal.Heading>Remove {removing.name}?</Modal.Heading>
-              </Modal.Header>
-              <Modal.Body>
-                <p className="text-default-500">They lose access to this console straight away. Their player account is not affected.</p>
-              </Modal.Body>
-              <Modal.Footer>
-                <Button variant="tertiary" onPress={() => setRemoving(null)}>
-                  Cancel
-                </Button>
-                <Button
-                  variant="danger"
-                  onPress={() =>
-                    void act(`/staff/${removing.id}/remove`).then(
-                      () => (toast("Removed from staff", { variant: "success" }), setRemoving(null)),
-                      (e) => (toast(e.message, { variant: "danger" }), setRemoving(null)),
-                    )
-                  }
-                >
-                  Remove access
-                </Button>
-              </Modal.Footer>
-            </Modal.Dialog>
-          </Modal.Container>
-        </Modal.Backdrop>
-      ) : null}
-    </>
+    <Gate areas={["staff"]}>
+      <StaffPageInner />
+    </Gate>
   );
 }
