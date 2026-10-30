@@ -25,6 +25,19 @@ export function francs(rappen: number) {
   return num(Math.round(rappen / 100));
 }
 
+/** Bytes → "4.2 GB", "820 MB" (powers of 1024, as Vault's quotas are). */
+export function bytes(n: number | null | undefined) {
+  if (n === null || n === undefined) return "–";
+  const units = ["B", "KB", "MB", "GB", "TB"];
+  let v = n;
+  let i = 0;
+  while (v >= 1024 && i < units.length - 1) {
+    v /= 1024;
+    i++;
+  }
+  return `${i === 0 || v >= 100 ? Math.round(v) : v.toFixed(1)} ${units[i]}`;
+}
+
 export function pct(share: number | null | undefined, digits = 2) {
   if (share === null || share === undefined) return "–";
   const v = share * 100;

@@ -47,6 +47,11 @@ export const CONSOLE = {
           "id": "wishlist",
           "label": "Wishlist",
           "ic": "gift"
+        },
+        {
+          "id": "vault",
+          "label": "Vault",
+          "ic": "lock"
         }
       ]
     },
@@ -107,6 +112,9 @@ export const CONSOLE = {
     },
     "wishlist": {
       "title": "Wishlist"
+    },
+    "vault": {
+      "title": "Vault storage"
     },
     "audit": {
       "title": "Audit log"
@@ -198,6 +206,13 @@ export const CONSOLE = {
       "Read",
       "Read",
       "Read"
+    ],
+    [
+      "Vault storage per person",
+      "Read",
+      "Read",
+      "Read",
+      "No"
     ],
     [
       "Audit log",

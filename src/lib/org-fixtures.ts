@@ -21,6 +21,8 @@ import type {
   StaffRow,
   StatusResponse,
   TournamentSummary,
+  VaultPerson,
+  VaultUsage,
   WishlistTotals,
 } from "./org-contract";
 
@@ -67,6 +69,7 @@ const MATRIX: Record<Area, [Access, Access, Access, Access]> = {
   casino: ["edit", "edit", "none", "none"],
   casino_moderation: ["edit", "edit", "edit", "read"],
   wishlist: ["read", "read", "read", "read"],
+  vault: ["read", "read", "read", "none"],
   audit: ["read", "read", "none", "none"],
   staff: ["edit", "none", "none", "none"],
 };
@@ -374,6 +377,32 @@ function wishlist(): WishlistTotals {
   };
 }
 
+function vault(): VaultUsage {
+  const GB = 1024 ** 3;
+  const people: VaultPerson[] = [
+    ["Lea Brunner", "lea.brunner@example.ch", "pro", 61.4 * GB, 100 * GB, 1840],
+    ["Matteo Rossi", "matteo@example.ch", "free", 9.1 * GB, 10 * GB, 412],
+    ["Noa Keller", "noa.keller@example.ch", "plus", 22.7 * GB, 50 * GB, 655],
+    ["Sven Huber", "sven@example.ch", "free", 1.2 * GB, 10 * GB, 37],
+    ["Aylin Demir", "aylin@example.ch", "free", 0.3 * GB, 10 * GB, 9],
+  ].map(([name, email, plan, used, quota, files], i) => ({
+    userId: `u_v${i}`,
+    name: name as string,
+    email: email as string,
+    plan: plan as VaultPerson["plan"],
+    used: Math.round(used as number),
+    quota: quota as number,
+    files: files as number,
+    createdAt: NOW - (120 - i * 20) * 86_400_000,
+    lastSeen: i === 4 ? null : NOW - i * 26 * 3_600_000,
+  }));
+  people.sort((a, b) => b.used - a.used);
+  return {
+    people,
+    totals: { vaults: people.length, used: people.reduce((s, p) => s + p.used, 0), quota: people.reduce((s, p) => s + p.quota, 0) },
+  };
+}
+
 function detail(id: string): RequestDetail {
   const r = requests().find((x) => x.id === id) ?? requests()[0];
   const kind = { them: "customer", us: "staff", int: "internal" } as const;
@@ -436,6 +465,7 @@ export async function fixtureCall<T>(method: "GET" | "POST", path: string): Prom
     [/^\/console\/tournaments$/, () => ({ tournaments: tournaments() })],
     [/^\/console\/organisers$/, () => ({ organisers: organisers() })],
     [/^\/console\/wishlist$/, wishlist],
+    [/^\/console\/vault$/, vault],
     [/^\/console\/audit$/, () => ({ entries: audit(q.get("area")), more: true })],
     [/^\/console\/staff$/, () => ({ staff: staff() })],
     [/^\/console\/search$/, () => ({ results: customers().filter((c) => c.name.toLowerCase().includes((q.get("q") ?? "").toLowerCase())).slice(0, 5).map((c) => ({ kind: "organisation", id: c.id, label: c.name, sub: "Organisation", href: `/customers/${c.id}` })) })],
