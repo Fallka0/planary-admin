@@ -65,10 +65,11 @@ const NAV_AREA: Record<string, Area[]> = {
   tournament: ["tournament"],
   casino: ["casino", "casino_moderation"],
   wishlist: ["wishlist"],
+  vault: ["vault"],
   audit: ["audit"],
   staff: ["staff"],
 };
-const NAV_HREF: Record<string, string> = { overview: "/", status: "/status", customers: "/customers", support: "/support", tournament: "/tournament", casino: "/casino", wishlist: "/wishlist", audit: "/audit", staff: "/staff" };
+const NAV_HREF: Record<string, string> = { overview: "/", status: "/status", customers: "/customers", support: "/support", tournament: "/tournament", casino: "/casino", wishlist: "/wishlist", vault: "/vault", audit: "/audit", staff: "/staff" };
 
 function active(pathname: string, id: string) {
   const href = NAV_HREF[id];

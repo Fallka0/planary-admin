@@ -17,6 +17,7 @@ The back office for every Planary app at **admin.planary.ch**. Staff only, in En
 | Tournament | `/tournament` | planary-org (mirror of the Tournament API) |
 | Casino | `/casino/*` | the casino API's `/admin` routes, the pages as before |
 | Wishlist | `/wishlist` | totals only, through planary-org from the Wishlist API |
+| Vault | `/vault` | storage per person (plan, used of quota, files, last visit), through planary-org from the Vault API. Never file names or contents |
 | Audit log | `/audit` | planary-org and the casino API |
 | Staff and roles | `/staff` | planary-org; role changes are mirrored to the casino API |
 
