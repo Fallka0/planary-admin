@@ -161,7 +161,7 @@ background:var(--frame);padding:14px;min-height:100vh;font-family:var(--body);fo
 .prog{height:2px;background:var(--panel2);overflow:hidden}
 .prog i{display:block;height:100%;width:62%;background:var(--ink)}
 .mtr{height:8px;border-radius:999px;background:var(--panel2);overflow:hidden}
-.mtr i{display:block;height:100%;border-radius:999px;background:var(--ink)}
+.mtr i{display:block;height:100%;min-width:0;border-radius:999px;background:var(--ink)}
 .mtr.warn i{background:var(--live)}
 
 /* data tables: CSS grid rows (the prototype runtime can't loop inside <tbody>; production can use <table>) */
@@ -291,6 +291,9 @@ background:var(--frame);padding:14px;min-height:100vh;font-family:var(--body);fo
 .fchip{height:32px;padding:0 12px;border-radius:999px;border:0;background:var(--panel);font:600 12px/1 var(--body);color:var(--t2);cursor:pointer;display:inline-flex;align-items:center;gap:6px}
 .fchip.on{background:var(--ink);color:var(--bg)}
 .fchip .c{opacity:.7;font-weight:500}
+/* a search next to the chips: same height and shape, pushed to the right */
+.kpis+.filters{margin-top:28px}
+.filters .finp{margin-left:auto;width:240px;height:32px;border-radius:999px;padding:0 14px;font-size:13px}
 
 /* wishlist */
 .priv{display:grid;grid-template-columns:auto minmax(0,1fr);gap:14px;padding:20px;border-radius:18px;background:var(--info-bg)}
@@ -473,3 +476,20 @@ td.dt-c{padding:0}
 /* Long machine text in a table cell wraps instead of running out of the box. */
 .dt-c.mono-t{white-space:normal;overflow-wrap:anywhere}
 .kv dd{overflow-wrap:anywhere}
+
+/* People: a person's page */
+.dt-link:hover{background:var(--panel2)}
+.pp-note{font-size:13px;line-height:1.5;padding:12px 14px;border-radius:12px;margin-bottom:14px}
+.pp-note.warn{background:var(--warn-bg);color:var(--warn)}
+.pp-note.err{background:var(--err-bg);color:var(--err)}
+.dlg-b .pp-note{margin:0}
+.pp-acts{display:flex;flex-wrap:wrap;gap:8px;margin-top:18px;padding-top:16px;border-top:1px solid var(--rule)}
+.pp-flags{display:grid;gap:8px;margin:16px 0 12px;font-size:13px;font-weight:600}
+.pp-flags li{display:flex;align-items:center;gap:8px}
+.pp-flags li .ic{color:var(--ok)}
+.pp-flags li.off{color:var(--warn)}
+.pp-flags li.off .ic{color:var(--warn)}
+.pp-hist{display:grid;gap:0}
+.pp-hist li{display:grid;gap:3px;padding:12px 0;border-top:1px solid var(--rule);font-size:13px}
+.pp-hist li:first-child{border-top:0;padding-top:0}
+.pp-danger{box-shadow:inset 0 0 0 1px var(--err-bg)}

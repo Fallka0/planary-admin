@@ -24,6 +24,8 @@ import type {
   VaultPerson,
   VaultUsage,
   WishlistTotals,
+  PersonDetail,
+  PersonRow,
 } from "./org-contract";
 
 const NOW = Date.parse("2026-10-20T20:11:00+02:00");
@@ -70,6 +72,8 @@ const MATRIX: Record<Area, [Access, Access, Access, Access]> = {
   casino_moderation: ["edit", "edit", "edit", "read"],
   wishlist: ["read", "read", "read", "read"],
   vault: ["read", "read", "read", "none"],
+  people: ["edit", "edit", "read", "none"],
+  people_ban: ["edit", "none", "none", "none"],
   audit: ["read", "read", "none", "none"],
   staff: ["edit", "none", "none", "none"],
 };
@@ -395,12 +399,52 @@ function vault(): VaultUsage {
     files: files as number,
     createdAt: NOW - (120 - i * 20) * 86_400_000,
     lastSeen: i === 4 ? null : NOW - i * 26 * 3_600_000,
+    restrictions:
+      i === 3
+        ? { uploads: false, sharing: false, quota: null, reason: "Shared pirated films by link.", since: NOW - 2 * 86_400_000 }
+        : { uploads: true, sharing: true, quota: null, reason: null, since: null },
   }));
   people.sort((a, b) => b.used - a.used);
   return {
     people,
     totals: { vaults: people.length, used: people.reduce((s, p) => s + p.used, 0), quota: people.reduce((s, p) => s + p.quota, 0) },
   };
+}
+
+/** Planary accounts: the Vault people plus two without a vault; one suspended, one banned. */
+function people(): PersonRow[] {
+  const v = vault().people;
+  const base: [string, string, string[]][] = [
+    ...v.map((p): [string, string, string[]] => [p.name, p.email, ["password"]]),
+    ["Jonas Meier", "jonas.meier@example.ch", ["google"]],
+    ["Chiara Bianchi", "chiara@example.ch", ["password", "github"]],
+  ];
+  return base.map(([name, email, signIn], i) => ({
+    id: v.find((p) => p.email === email)?.userId ?? `u_p${i}`,
+    name,
+    email,
+    verified: true,
+    createdAt: NOW - (200 - i * 23) * DAY,
+    lastSeen: i === 5 ? null : NOW - i * 7 * 3_600_000,
+    signIn,
+    status: email.startsWith("sven") ? "suspended" : email.startsWith("chiara") ? "banned" : "active",
+    bannedAt: email.startsWith("chiara") ? NOW - 40 * DAY : null,
+    suspension: email.startsWith("sven") ? { since: NOW - 2 * DAY, until: NOW + 12 * DAY, reason: "Shared pirated films by link." } : null,
+  }));
+}
+
+function person(id: string): PersonDetail {
+  const p = people().find((x) => x.id === id) ?? people()[0];
+  const mine = vault().people.find((x) => x.userId === p.id) ?? null;
+  const by = { id: "u_mykyta", name: "Mykyta P." };
+  const history =
+    p.status === "suspended"
+      ? [
+          { id: "h2", at: NOW - 2 * DAY, area: "people" as const, actor: by, action: "person.suspend", sentence: "Suspended the account until 01.11.2026", target: p.email, details: "Shared pirated films by link." },
+          { id: "h1", at: NOW - 2 * DAY - 5 * MIN, area: "people" as const, actor: by, action: "person.vault_restrict", sentence: "Restricted the Vault: uploads off, sharing off", target: p.email, details: "Shared pirated films by link." },
+        ]
+      : [];
+  return { person: p, vault: mine, history };
 }
 
 function detail(id: string): RequestDetail {
@@ -466,6 +510,20 @@ export async function fixtureCall<T>(method: "GET" | "POST", path: string): Prom
     [/^\/console\/organisers$/, () => ({ organisers: organisers() })],
     [/^\/console\/wishlist$/, wishlist],
     [/^\/console\/vault$/, vault],
+    [
+      /^\/console\/people$/,
+      () => {
+        const all = people();
+        const term = (q.get("q") ?? "").toLowerCase();
+        const st = q.get("status");
+        return {
+          people: all.filter((p) => (!st || p.status === st) && (!term || p.name.toLowerCase().includes(term) || p.email.includes(term))),
+          more: false,
+          counts: { all: all.length, suspended: all.filter((p) => p.status === "suspended").length, banned: all.filter((p) => p.status === "banned").length },
+        };
+      },
+    ],
+    [/^\/console\/people\/([^/]+)$/, () => person(m![1])],
     [/^\/console\/audit$/, () => ({ entries: audit(q.get("area")), more: true })],
     [/^\/console\/staff$/, () => ({ staff: staff() })],
     [/^\/console\/search$/, () => ({ results: customers().filter((c) => c.name.toLowerCase().includes((q.get("q") ?? "").toLowerCase())).slice(0, 5).map((c) => ({ kind: "organisation", id: c.id, label: c.name, sub: "Organisation", href: `/customers/${c.id}` })) })],

@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { Gate, useBusy } from "@/components/console/Shell";
+import { Gate, useBusy, useConsole } from "@/components/console/Shell";
 import { ErrorCard, Ic, PageHead, Sk, Table, Td } from "@/components/console/ui";
 import { CONSOLE } from "@/design/console-copy";
 import { bytes, date, lastSeen, num } from "@/lib/fmt";
@@ -17,8 +18,22 @@ const NEARLY_FULL = 0.8;
 
 const share = (p: VaultPerson) => (p.quota ? p.used / p.quota : 0);
 
+/** "<1%" rather than a misleading "0%" for a vault with something in it. */
+const pct = (p: VaultPerson) => {
+  const s = share(p);
+  return p.used && s < 0.01 ? "<1%" : `${Math.round(s * 100)}%`;
+};
+
+/** Last visit in the same style as "Since": today, yesterday, n days ago, then the full date. */
+function visited(ms: number | null, t: number) {
+  if (!ms) return "never";
+  const days = Math.floor((t - ms) / 86_400_000);
+  return days < 2 ? lastSeen(ms, t) : days < 30 ? `${days} days ago` : date(ms);
+}
+
 function Vault() {
   const { data, error, loading, reload } = useOrg<VaultUsage>("/console/vault", 300_000);
+  const { can } = useConsole();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   useBusy(loading);
@@ -93,7 +108,7 @@ function Vault() {
                 {label} <span className="c">{data ? num(all.filter((p) => matches(p, f)).length) : ""}</span>
               </button>
             ))}
-            <input className="inp" type="search" placeholder="Name or email" aria-label="Search vaults" value={query} onChange={(e) => setQuery(e.target.value)} style={{ marginLeft: "auto", maxWidth: 240 }} />
+            <input className="inp finp" type="search" placeholder="Name or email" aria-label="Search vaults" value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
 
           <section className="box">
@@ -101,9 +116,9 @@ function Vault() {
               <Sk h={420} r={12} />
             ) : (
               <Table
-                cols="minmax(0,2fr) 70px minmax(0,1.6fr) 110px 70px 110px 110px"
+                cols="minmax(0,2fr) 72px minmax(0,1.5fr) 96px 64px 112px 104px"
                 colsS="minmax(0,1fr) auto"
-                head={[{ h: "Person" }, { h: "Plan", hide: true }, { h: "Used of plan" }, { h: "Stored", r: true }, { h: "Files", r: true, hide: true }, { h: "Last visit", hide: true }, { h: "Since", hide: true }]}
+                head={[{ h: "Person" }, { h: "Plan", hide: true }, { h: "Usage" }, { h: "Stored", r: true }, { h: "Files", r: true, hide: true }, { h: "Last visit", r: true, hide: true }, { h: "Since", r: true, hide: true }]}
               >
                 {rows.map((p) => {
                   const s = share(p);
@@ -111,7 +126,18 @@ function Vault() {
                     <tr className="dt-r" key={p.userId}>
                       <Td>
                         <span className="who" style={{ display: "grid", gap: 2 }}>
-                          <b>{p.name}</b>
+                          {can("people") ? (
+                            <Link href={`/people/${p.userId}`} className="ul" style={{ fontWeight: 700, color: "inherit" }}>
+                              {p.name}
+                            </Link>
+                          ) : (
+                            <b>{p.name}</b>
+                          )}
+                          {p.restrictions && (!p.restrictions.uploads || !p.restrictions.sharing || p.restrictions.quota !== null) ? (
+                            <span className="box-s" style={{ color: "var(--warn)" }}>
+                              Restricted
+                            </span>
+                          ) : null}
                           <span className="box-s">{p.email}</span>
                         </span>
                       </Td>
@@ -121,10 +147,10 @@ function Vault() {
                       <Td>
                         <span style={{ display: "grid", gap: 4 }} title={`${bytes(p.used)} of ${bytes(p.quota)}`}>
                           <span className={`mtr${s >= NEARLY_FULL ? " warn" : ""}`} aria-hidden="true">
-                            <i style={{ width: `${Math.min(100, Math.max(p.used ? 1 : 0, s * 100))}%` }} />
+                            <i style={{ width: `${Math.min(100, s * 100)}%` }} />
                           </span>
                           <span className="box-s num">
-                            {Math.round(s * 100)}% of {bytes(p.quota)}
+                            {pct(p)} of {bytes(p.quota)}
                           </span>
                         </span>
                       </Td>
@@ -134,8 +160,12 @@ function Vault() {
                       <Td r hide>
                         {num(p.files)}
                       </Td>
-                      <Td hide>{lastSeen(p.lastSeen, t)}</Td>
-                      <Td hide>{date(p.createdAt)}</Td>
+                      <Td r hide>
+                        <span className="num">{visited(p.lastSeen, t)}</span>
+                      </Td>
+                      <Td r hide>
+                        <span className="num">{date(p.createdAt)}</span>
+                      </Td>
                     </tr>
                   );
                 })}

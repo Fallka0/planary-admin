@@ -23,6 +23,11 @@ export const CONSOLE = {
           "ic": "org"
         },
         {
+          "id": "people",
+          "label": "People",
+          "ic": "users"
+        },
+        {
           "id": "support",
           "label": "Support",
           "ic": "inbox",
@@ -115,6 +120,9 @@ export const CONSOLE = {
     },
     "vault": {
       "title": "Vault storage"
+    },
+    "people": {
+      "title": "People"
     },
     "audit": {
       "title": "Audit log"
@@ -212,6 +220,20 @@ export const CONSOLE = {
       "Read",
       "Read",
       "Read",
+      "No"
+    ],
+    [
+      "People: suspend and restrict",
+      "Edit",
+      "Edit",
+      "Read",
+      "No"
+    ],
+    [
+      "People: permanent ban",
+      "Edit",
+      "No",
+      "No",
       "No"
     ],
     [

@@ -17,6 +17,13 @@ export type PlanId = 'gratis' | 'plus';
 export type PassId = 'tournament_pass';
 /** How the organisation pays its subscription. TWINT is left room for, not offered yet. */
 export type PayBy = 'card' | 'invoice';
+/** Products sold as their own subscription next to Planary Plus (ADR 0003). */
+export type ProductId = 'vault';
+/** Vault's tiers, per person: Vault Free, Vault Plus, Vault Pro. */
+export type VaultPlanId = 'free' | 'plus' | 'pro';
+export type BillingPeriod = 'month' | 'year';
+/** 'personal': an organisation of one, created when a person buys a product on their own. */
+export type OrgKind = 'team' | 'personal';
 export type StaffRole = 'owner' | 'manager' | 'support' | 'viewer';
 export type MemberRole = 'owner' | 'member';
 export type Access = 'edit' | 'read' | 'none';
@@ -32,6 +39,8 @@ export type Area =
   | 'casino_moderation'
   | 'wishlist'
   | 'vault'
+  | 'people'
+  | 'people_ban'
   | 'audit'
   | 'staff';
 export type ServiceId = 'auth' | 'tournament' | 'casino' | 'wishlist' | 'web';
@@ -106,12 +115,37 @@ export interface PassEntitlement {
   receiptUrl: string | null;
 }
 
+/** A Vault tier and its prices. */
+export interface VaultPlan {
+  id: VaultPlanId;
+  /** "Vault Free", "Vault Plus", "Vault Pro" */
+  name: string;
+  /** Rappen per month, and per year (one invoice). 0 for Vault Free. */
+  monthly: number;
+  yearly: number;
+  quotaGb: number;
+}
+
+/** An account's Vault subscription, for the portal's billing page. */
+export interface VaultBilling {
+  plans: VaultPlan[];
+  /** The plan in effect, including a staff override. */
+  current: VaultPlanId;
+  period: BillingPeriod | null;
+  payBy: PayBy | null;
+  renewsAt: number | null;
+  /** Cancelling: the day it falls back to Vault Free. */
+  cancelAt: number | null;
+  /** A downgrade that takes effect at `renewsAt`. */
+  pending: { plan: Exclude<VaultPlanId, 'free'>; period: BillingPeriod } | null;
+}
+
 /** One line of the subscription or an invoice: the base plan, an add-on, or a one-off. */
 export interface SubscriptionLine {
   kind: 'base' | 'addon' | 'once';
-  /** "Plus", "Turnier-Pass · Planary Winter Cup" */
+  /** "Planary Plus", "Vault Plus", "Turnier-Pass · Planary Winter Cup" */
   name: string;
-  period: 'year' | 'once';
+  period: 'month' | 'year' | 'once';
   /** Rappen */
   amount: number;
   tournamentId: string | null;
@@ -123,7 +157,9 @@ export type BillingState = 'free' | 'active' | 'overdue' | 'card_expires' | 'can
 /** The checkout body: a plan (Plus, by card or invoice) or a pass (one tournament, by card). */
 export type CheckoutBody =
   | { plan: 'plus'; payBy: PayBy; returnTo?: string }
-  | { pass: 'tournament'; tournamentId: string; returnTo?: string };
+  | { pass: 'tournament'; tournamentId: string; returnTo?: string }
+  /** Vault: monthly by card; yearly by card or invoice. */
+  | { product: 'vault'; plan: 'plus' | 'pro'; period: BillingPeriod; payBy: PayBy; returnTo?: string };
 
 export interface CheckoutResult {
   /** Card: the provider's checkout page. Invoice (Plus): the portal's done page, nothing charged today. */
@@ -135,6 +171,10 @@ export interface CheckoutStatus {
   id: string;
   orgId: string;
   kind: 'plan' | 'pass';
+  /** Set when a product plan was bought (Vault), with its plan and period. */
+  product: ProductId | null;
+  productPlan: 'plus' | 'pro' | null;
+  period: BillingPeriod | null;
   state: 'pending' | 'paid' | 'failed';
   /** Why a card payment failed, in German, when the provider says so. */
   failure: string | null;
@@ -384,12 +424,56 @@ export interface VaultPerson {
   userId: string;
   name: string;
   email: string;
-  plan: 'free' | 'plus' | 'pro';
+  plan: VaultPlanId;
   used: number;
+  /** The limit that holds: staff's override (restrictions.quota) or the plan's. */
   quota: number;
   files: number;
   createdAt: number;
   lastSeen: number | null;
+  restrictions: VaultRestrictions;
+}
+
+/** What staff have turned off for one vault. All on and quota null: nothing restricted. */
+export interface VaultRestrictions {
+  uploads: boolean;
+  sharing: boolean;
+  /** Bytes, in place of the plan's limit; null keeps the plan's. */
+  quota: number | null;
+  reason: string | null;
+  since: number | null;
+}
+
+export type PersonStatus = 'active' | 'suspended' | 'banned';
+
+/** A Planary account, as planary-auth reports it. No password, no tokens. */
+export interface PersonRow {
+  id: string;
+  name: string;
+  email: string;
+  verified: boolean;
+  createdAt: number;
+  lastSeen: number | null;
+  /** password, google, github */
+  signIn: string[];
+  status: PersonStatus;
+  bannedAt: number | null;
+  suspension: { since: number; until: number | null; reason: string } | null;
+}
+
+export interface PersonDetail {
+  person: PersonRow;
+  /** null: no vault; 'not_connected': Vault couldn't be asked. */
+  vault: VaultPerson | null | 'not_connected';
+  /** Console actions on this person, newest first. */
+  history: AuditEntry[];
+}
+
+/** What a change did; `mailed` says whether the person got a mail about it. */
+export interface PersonChange {
+  person: PersonRow;
+  vault?: VaultPerson | null;
+  mailed: boolean;
 }
 
 /** Storage per person in Planary Vault, largest first. */
@@ -412,7 +496,8 @@ export interface ConsoleApi {
   'GET /console/customers/:id': { R: CustomerDetail };
   'POST /console/customers/:id/notes': { B: { body: string }; R: { ok: true } };
   'POST /console/customers/:id/reminder': { B: { invoiceId: string }; R: { ok: true } };
-  'POST /console/customers/:id/plan': { B: { plan: PlanId; reason: string }; R: { ok: true } };
+  /** Planary Plus by default; `product: 'vault'` sets the Vault plan instead (`plan` a VaultPlanId). */
+  'POST /console/customers/:id/plan': { B: { plan: PlanId; reason: string; product?: undefined } | { product: 'vault'; plan: VaultPlanId; reason: string }; R: { ok: true } };
   'GET /console/support': { Q: { status?: RequestStatus; who?: 'all' | 'mine' | 'unassigned' }; R: { requests: RequestSummary[]; counts: Record<RequestStatus, number>; /** Staff who can be assigned (support edit). */ assignable: { id: string; name: string }[] } };
   /** Also marks the request as seen by staff (clears `unread`). */
   'GET /console/support/:id': { R: RequestDetail };
@@ -422,6 +507,13 @@ export interface ConsoleApi {
   'GET /console/organisers': { R: { organisers: OrganiserRow[] } };
   'GET /console/wishlist': { R: WishlistTotals };
   'GET /console/vault': { R: VaultUsage };
+  'GET /console/people': { Q: { q?: string; status?: 'suspended' | 'banned'; offset?: string }; R: { people: PersonRow[]; more: boolean; counts: { all: number; suspended: number; banned: number } } };
+  'GET /console/people/:id': { R: PersonDetail };
+  'POST /console/people/:id/suspend': { B: { until: number | null; reason: string; notify: boolean }; R: PersonChange };
+  'POST /console/people/:id/unsuspend': { B: { notify: boolean }; R: PersonChange };
+  'POST /console/people/:id/sign-out': { B: Record<string, never>; R: PersonChange };
+  'POST /console/people/:id/vault': { B: { uploads: boolean; sharing: boolean; quota: number | null; reason: string; notify: boolean }; R: PersonChange };
+  'POST /console/people/:id/ban': { B: { reason: string; email: string; notify: boolean }; R: PersonChange & { vaultDeleted: 'deleted' | 'not_configured' | 'failed' } };
   'GET /console/audit': { Q: { area?: string; staff?: string; before?: string }; R: { entries: AuditEntry[]; more: boolean } };
   'GET /console/staff': { R: { staff: StaffRow[] } };
   'POST /console/staff': { B: { email: string; role: StaffRole }; R: { ok: true } };
@@ -432,7 +524,7 @@ export interface ConsoleApi {
 
 // ── portal ───────────────────────────────────────────
 
-export interface PortalOrgSummary { id: string; name: string; initials: string; role: MemberRole; plan: PlanId; services: OrgService[] }
+export interface PortalOrgSummary { id: string; name: string; initials: string; role: MemberRole; plan: PlanId; services: OrgService[]; kind: OrgKind }
 
 export interface PortalBanner {
   kind: 'incident' | 'overdue';
@@ -454,6 +546,8 @@ export interface PortalOrg {
   role: MemberRole;
   plan: Plan;
   services: OrgService[];
+  /** 'personal': a person's own billing account (Vault); the portal shows Abrechnung and Support only. */
+  kind: OrgKind;
   /** Plus: next renewal. */
   renewsAt: number | null;
   billingState: BillingState;
@@ -536,8 +630,8 @@ export interface PortalApi {
   'GET /portal/orgs/:id/billing': { R: Billing };
   /** Owners only. Pass: the tournament must belong to the organisation (or its owner, who joins it). */
   'POST /portal/orgs/:id/checkout': { B: CheckoutBody; R: CheckoutResult };
-  /** A person without an organisation: creates it (they become owner), then checks out. */
-  'POST /portal/checkout': { B: CheckoutBody & { org: { name: string; email: string } }; R: CheckoutResult & { orgId: string } };
+  /** A person without an organisation: creates it (they become owner), then checks out. For Vault, `org` may be left out: the person's personal account is used (created on first use). */
+  'POST /portal/checkout': { B: CheckoutBody & { org?: { name: string; email: string } }; R: CheckoutResult & { orgId: string } };
   'GET /portal/checkout/:cid': { R: CheckoutStatus };
   /** Plus: switch between card and invoice for the next renewal. */
   'POST /portal/orgs/:id/pay-by': { B: { payBy: PayBy }; R: { ok: true } };
@@ -547,6 +641,11 @@ export interface PortalApi {
   'POST /portal/orgs/:id/cancel': { B: { keep: string[] }; R: { cancelAt: number } };
   'POST /portal/orgs/:id/cancel/undo': { R: { ok: true } };
   'POST /portal/orgs/:id/billing-portal': { R: { url: string } };
+  /** Owners only. Upgrades apply now (prorated), downgrades at the end of the period; the current plan and period undo a pending downgrade. */
+  'POST /portal/orgs/:id/vault/change': { B: { plan: 'plus' | 'pro'; period: BillingPeriod }; R: { ok: true; at: number | null } };
+  /** Owners only. Vault Free at the end of the period, or undo that. */
+  'POST /portal/orgs/:id/vault/cancel': { R: { cancelAt: number } };
+  'POST /portal/orgs/:id/vault/cancel/undo': { R: { ok: true } };
   'GET /portal/orgs/:id/members': { R: { members: PortalMember[]; invites: PortalInvite[]; seats: number } };
   'POST /portal/orgs/:id/invites': { B: { email: string; role: MemberRole }; R: { ok: true } };
   'POST /portal/orgs/:id/invites/:iid/resend': { R: { ok: true } };
@@ -584,6 +683,21 @@ export interface Billing {
   /** Canceling: the day the organisation is on Gratis. */
   cancelAt: number | null;
   usage: { largestTournament: number; running: number; organisers: number; wishlists: number };
+  /** The account's Vault subscription; Vault Free when it has none. */
+  vault: VaultBilling;
+}
+
+/** What one person may use in each product, from their personal account and the organisations they own. */
+export interface EntitlementsResponse {
+  vault: {
+    plan: VaultPlanId;
+    /** override: staff set it. overdue: an invoice is past its grace date, so Vault Free applies. */
+    source: 'subscription' | 'override' | 'overdue' | 'default';
+    /** Cancelling: when it falls back to Vault Free. */
+    until: number | null;
+    /** The billing account it comes from. */
+    orgId: string | null;
+  };
 }
 
 export interface LimitsResponse {
@@ -611,6 +725,7 @@ export interface TournamentEvent extends TournamentSummary {
 
 export interface InternalApi {
   'GET /internal/limits': { Q: { org?: string; tournament?: string; user: string }; R: LimitsResponse };
+  'GET /internal/entitlements': { Q: { user: string }; R: EntitlementsResponse };
   'GET /internal/orgs/:id/membership': { Q: { user: string }; R: { role: MemberRole | null } };
   /** The account's organisations, for Tournament and Wishlist (each filters by `services`). */
   'GET /internal/people/:id/orgs': { R: { orgs: (PortalOrgSummary & { wishlist: WishlistLimits })[] } };
