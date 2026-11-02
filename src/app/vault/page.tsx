@@ -1,7 +1,8 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
-import { Gate, useBusy } from "@/components/console/Shell";
+import { Gate, useBusy, useConsole } from "@/components/console/Shell";
 import { ErrorCard, Ic, PageHead, Sk, Table, Td } from "@/components/console/ui";
 import { CONSOLE } from "@/design/console-copy";
 import { bytes, date, lastSeen, num } from "@/lib/fmt";
@@ -32,6 +33,7 @@ function visited(ms: number | null, t: number) {
 
 function Vault() {
   const { data, error, loading, reload } = useOrg<VaultUsage>("/console/vault", 300_000);
+  const { can } = useConsole();
   const [filter, setFilter] = useState<Filter>("all");
   const [query, setQuery] = useState("");
   useBusy(loading);
@@ -124,7 +126,18 @@ function Vault() {
                     <tr className="dt-r" key={p.userId}>
                       <Td>
                         <span className="who" style={{ display: "grid", gap: 2 }}>
-                          <b>{p.name}</b>
+                          {can("people") ? (
+                            <Link href={`/people/${p.userId}`} className="ul" style={{ fontWeight: 700, color: "inherit" }}>
+                              {p.name}
+                            </Link>
+                          ) : (
+                            <b>{p.name}</b>
+                          )}
+                          {p.restrictions && (!p.restrictions.uploads || !p.restrictions.sharing || p.restrictions.quota !== null) ? (
+                            <span className="box-s" style={{ color: "var(--warn)" }}>
+                              Restricted
+                            </span>
+                          ) : null}
                           <span className="box-s">{p.email}</span>
                         </span>
                       </Td>
