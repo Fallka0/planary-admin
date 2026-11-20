@@ -63,7 +63,7 @@ function People() {
             <Table
               cols="minmax(0,2fr) 110px minmax(0,1.6fr) 150px"
               colsS="minmax(0,1fr) auto"
-              head={[{ h: "Person" }, { h: "Role" }, { h: "Class or teaches", hide: true }, { h: "Last sign-in", r: true, hide: true }]}
+              head={[{ h: "Person" }, { h: "Role" }, { h: "Class or teaches", hide: true }, { h: "Last active", r: true, hide: true }]}
             >
               {data.people.map((p) => (
                 <tr className="dt-r dt-link" key={p.id}>

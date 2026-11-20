@@ -250,7 +250,7 @@ function Person({ id }: { id: string }) {
                 <dd>{p.classTeacherOf.join(", ") || "–"}</dd>
               </>
             )}
-            <dt>Last sign-in</dt>
+            <dt>Last active</dt>
             <dd>{wallTime(p.lastLoginAt)}</dd>
           </dl>
           {edit ? (
