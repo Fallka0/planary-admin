@@ -757,7 +757,7 @@ export interface BwdPerson {
   email: string;
   role: BwdRole;
   classCode: string | null;
-  /** ISO-like wall time from the portal ("2026-11-20T08:15"), or null */
+  /** Last sign-in or activity, wall time from the portal ("2026-11-20T08:15", within 10 minutes), or null */
   lastLoginAt: string | null;
   assignments: BwdAssignment[];
   classTeacherOf: string[];
