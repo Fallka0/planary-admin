@@ -83,6 +83,7 @@ const AREAS: [string, string][] = [
   ["tournament", "Tournament"],
   ["casino", "Casino"],
   ["wishlist", "Wishlist"],
+  ["bwdportal", "bwd Portal"],
   ["staff", "Staff"],
   ["portal", "Portal (customers)"],
 ];

@@ -1,6 +1,7 @@
 // planary-org answered from the handoff's sample data (content/fixtures/console.json), shaped like
 // the real API (org-contract.ts). Only used when NEXT_PUBLIC_CONSOLE_DATA=fixtures.
 
+import { bwdClasses, bwdPeople, bwdPerson, bwdSubjects } from "./bwdportal-fixtures";
 import { CONSOLE_FIXTURES as F } from "./console-fixtures";
 import type {
   Access,
@@ -72,6 +73,7 @@ const MATRIX: Record<Area, [Access, Access, Access, Access]> = {
   casino_moderation: ["edit", "edit", "edit", "read"],
   wishlist: ["read", "read", "read", "read"],
   vault: ["read", "read", "read", "none"],
+  bwdportal: ["edit", "edit", "read", "none"],
   people: ["edit", "edit", "read", "none"],
   people_ban: ["edit", "none", "none", "none"],
   audit: ["read", "read", "none", "none"],
@@ -510,6 +512,10 @@ export async function fixtureCall<T>(method: "GET" | "POST", path: string): Prom
     [/^\/console\/organisers$/, () => ({ organisers: organisers() })],
     [/^\/console\/wishlist$/, wishlist],
     [/^\/console\/vault$/, vault],
+    [/^\/console\/bwdportal\/people$/, () => bwdPeople(q)],
+    [/^\/console\/bwdportal\/people\/([^/]+)$/, () => bwdPerson(m![1])],
+    [/^\/console\/bwdportal\/classes$/, bwdClasses],
+    [/^\/console\/bwdportal\/subjects$/, bwdSubjects],
     [
       /^\/console\/people$/,
       () => {

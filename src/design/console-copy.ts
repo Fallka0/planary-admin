@@ -57,6 +57,11 @@ export const CONSOLE = {
           "id": "vault",
           "label": "Vault",
           "ic": "lock"
+        },
+        {
+          "id": "bwdportal",
+          "label": "bwd Portal",
+          "ic": "list"
         }
       ]
     },
@@ -120,6 +125,9 @@ export const CONSOLE = {
     },
     "vault": {
       "title": "Vault storage"
+    },
+    "bwdportal": {
+      "title": "bwd Portal"
     },
     "people": {
       "title": "People"
@@ -219,6 +227,13 @@ export const CONSOLE = {
       "Vault storage per person",
       "Read",
       "Read",
+      "Read",
+      "No"
+    ],
+    [
+      "bwd Portal: roles, teachers, classes",
+      "Edit",
+      "Edit",
       "Read",
       "No"
     ],
